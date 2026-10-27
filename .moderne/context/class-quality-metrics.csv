@@ -1,0 +1,2 @@
+Source path,Class name,Line count,Method count,Field count,WMC,LCOM4,TCC,CBO,Maintainability index
+src/test/java/io/moderne/java/RecipeLoadingTest.java,io.moderne.java.RecipeLoadingTest,8,1,0,1,1,1.0,1,78.05770858823097
