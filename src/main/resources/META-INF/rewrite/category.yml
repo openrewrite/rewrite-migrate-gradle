@@ -19,3 +19,31 @@ type: specs.openrewrite.org/v1beta/category
 name: Modernize
 packageName: org.openrewrite.gradle.migrate
 description: Modernize your Gradle build to run on the current Gradle version. Replace APIs and build conventions that later Gradle releases deprecated or removed, and adopt the idioms those releases expect.
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'Application plugin'
+packageName: org.openrewrite.gradle.migrate.application
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'Dependencies and repositories'
+packageName: org.openrewrite.gradle.migrate.artifacts
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'JaCoCo'
+packageName: org.openrewrite.gradle.migrate.jacoco
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'Java plugin'
+packageName: org.openrewrite.gradle.migrate.java
+---
+type: specs.openrewrite.org/v1beta/category
+name: '`gradle.properties`'
+packageName: org.openrewrite.gradle.migrate.properties
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'Code quality'
+packageName: org.openrewrite.gradle.migrate.quality
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'Tasks'
+packageName: org.openrewrite.gradle.migrate.tasks
