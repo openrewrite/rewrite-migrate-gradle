@@ -15,22 +15,17 @@
 <div align="center">
 
 <!-- Keep the gap above this line, otherwise they won't render correctly! -->
-[![ci](https://github.com/moderneinc/rewrite-migrate-gradle/actions/workflows/ci.yml/badge.svg)](https://github.com/moderneinc/rewrite-migrate-gradle/actions/workflows/ci.yml)
+[![ci](https://codegenomeproject.org/ci/modules/openrewrite/rewrite-migrate-gradle/badge.svg)](https://codegenomeproject.org/ci/modules/openrewrite/rewrite-migrate-gradle/builds/latest)
 [![Contributing Guide](https://img.shields.io/badge/Contributing-Guide-informational)](https://github.com/openrewrite/.github/blob/main/CONTRIBUTING.md)
 </div>
 
-### What is this?
+## What is this?
 
-This is a template repository for creating new OpenRewrite modules. It provides a starting point with the necessary structure and configuration to help you get started quickly.
+This project implements an [OpenRewrite](https://github.com/openrewrite/rewrite) module with recipes for migrating Gradle builds to newer versions of Gradle, and for adopting the build conventions those versions expect.
 
-### To do after generating your new module
-- [ ] Change the above description to reflect your module
-- [ ] [Add to rewrite-recipe-bom](https://github.com/openrewrite/rewrite-recipe-bom/commit/c13a444e37b6545c7e56c575e8846d063dda3d6f), or [moderne-recipe-bom](https://github.com/moderneinc/moderne-recipe-bom/blob/main/build.gradle.kts) if proprietary; the recipe docs pick up modules from there
-- [ ] Add to the Code Genome Project's [members.txt](https://github.com/moderneinc/codegenomeproject/blob/main/ci/src/main/resources/io/moderne/codegenome/ci/members.txt), so that the nightly release train builds and releases it, and ask a Code Genome Project admin to add the same line to production's membership
-- [ ] Add to [dependency-vulnerability-reports](https://github.com/moderneinc/dependency-vulnerability-reports/blob/main/.github/workflows/openrewrite-vulnerability-analysis.yml)
-- [ ] Deploy to the Moderne Platform as recipe module, [here](https://app.moderne.io/recipes/deploy)
-- [ ] [Add the Moderne Release Notes Generator](https://github.com/organizations/moderneinc/settings/installations/88151565) to the project, such that release notes get included in moderne-docs
-- [ ] Remove this to do list
+It is the migration counterpart to [rewrite-gradle](https://github.com/openrewrite/rewrite/tree/main/rewrite-gradle), which stays focused on parsing Gradle builds and modeling them. Recipes that change a build to suit a newer Gradle live here.
+
+Browse [all available recipes in the recipe catalog](https://docs.openrewrite.org/recipes/gradle/migrate).
 
 ## Contributing
 

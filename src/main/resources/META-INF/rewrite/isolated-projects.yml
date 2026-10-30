@@ -1,0 +1,43 @@
+#
+# Copyright 2026 the original author or authors.
+# <p>
+# Licensed under the Moderne Source Available License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://docs.moderne.io/licensing/moderne-source-available-license
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.migrate.properties.MigrateIsolatedProjectsProperties
+displayName: Rename the incubating `org.gradle.unsafe.isolated-projects` properties
+description: >-
+  Gradle 9.7 promotes the Isolated Projects feature flags out of the `unsafe` namespace and deprecates the legacy
+  property names. `org.gradle.unsafe.isolated-projects` becomes `org.gradle.isolated-projects`,
+  `org.gradle.unsafe.isolated-projects.diagnostics` becomes `org.gradle.isolated-projects.diagnostics` and
+  `org.gradle.unsafe.isolated-projects.dangerously-ignore-problems` becomes
+  `org.gradle.isolated-projects.dangerously-ignore-problems`. The legacy names still work as aliases, but will be
+  removed in a future release.
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: '**/gradle.properties'
+recipeList:
+  - org.openrewrite.properties.ChangePropertyKey:
+      oldPropertyKey: org.gradle.unsafe.isolated-projects.dangerously-ignore-problems
+      newPropertyKey: org.gradle.isolated-projects.dangerously-ignore-problems
+      relaxedBinding: false
+  - org.openrewrite.properties.ChangePropertyKey:
+      oldPropertyKey: org.gradle.unsafe.isolated-projects.diagnostics
+      newPropertyKey: org.gradle.isolated-projects.diagnostics
+      relaxedBinding: false
+  - org.openrewrite.properties.ChangePropertyKey:
+      oldPropertyKey: org.gradle.unsafe.isolated-projects
+      newPropertyKey: org.gradle.isolated-projects
+      relaxedBinding: false

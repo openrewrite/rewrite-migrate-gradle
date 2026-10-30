@@ -1,5 +1,8 @@
+rootProject.name = "rewrite-migrate-gradle"
+
 pluginManagement {
     repositories {
+        mavenLocal()
         maven {
             name = "codegenome"
             url = uri("https://artifacts.codegenomeproject.org/maven")
@@ -15,5 +18,3 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-
-rootProject.name = "rewrite-migrate-gradle"

@@ -1,33 +1,21 @@
-@file:Suppress("UnstableApiUsage")
-
-
 plugins {
     id("org.openrewrite.build.recipe-library") version "latest.release"
-    id("org.openrewrite.build.moderne-proprietary-license") version "latest.release"
+    id("org.openrewrite.build.moderne-source-available-license") version "latest.release"
 }
 
-group = "io.moderne.recipe"
-description = "OpenRewrite recipes for migrategradle."
+group = "org.openrewrite.recipe"
+description = "Migrate to later Gradle versions. Automatically."
 
 val rewriteVersion = rewriteRecipe.rewriteVersion.get()
 dependencies {
-    annotationProcessor("org.projectlombok:lombok:latest.release")
-    compileOnly("org.projectlombok:lombok:latest.release")
-
     implementation(platform("org.openrewrite:rewrite-bom:${rewriteVersion}"))
+    implementation("org.openrewrite:rewrite-gradle")
+    implementation("org.openrewrite:rewrite-groovy")
     implementation("org.openrewrite:rewrite-java")
-
-    annotationProcessor("org.openrewrite:rewrite-templating:${rewriteVersion}")
-    implementation("org.openrewrite:rewrite-templating:${rewriteVersion}")
-    compileOnly("com.google.errorprone:error_prone_core:2.+") {
-        exclude("com.google.auto.service", "auto-service-annotations")
-        exclude("io.github.eisop", "dataflow-errorprone")
-    }
+    implementation("org.openrewrite:rewrite-kotlin")
+    implementation("org.openrewrite:rewrite-properties")
 
     testImplementation("org.openrewrite:rewrite-test")
-    testRuntimeOnly("org.openrewrite:rewrite-java-21")
-}
 
-tasks.withType<JavaCompile> {
-    options.compilerArgs.add("-Arewrite.javaParserClasspathFrom=resources")
+    testRuntimeOnly("org.openrewrite:rewrite-java-21")
 }
