@@ -1,0 +1,56 @@
+#
+# Copyright 2026 the original author or authors.
+# <p>
+# Licensed under the Moderne Source Available License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://docs.moderne.io/licensing/moderne-source-available-license
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.migrate.MigrateToGradle9
+displayName: Migrate to Gradle 9 from Gradle 8
+description: Migrate to version 9.x. See the Gradle upgrade guide from [version 8.x to 9.0](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.
+recipeList:
+  - org.openrewrite.gradle.migrate.MigrateToGradle8
+  - org.openrewrite.gradle.UpdateGradleWrapper:
+      version: 9.x
+      addIfMissing: false
+  # Map notation has been deprecated in 9.1+
+  - org.openrewrite.gradle.DependencyUseStringNotation
+  - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
+  - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
+  - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
+  # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
+  - org.openrewrite.gradle.migrate.java.UseJavaExtensionBlock
+  - org.openrewrite.gradle.migrate.artifacts.RewriteSpreadAllInConfigurationsBlock
+  # version = { } is invalid Gradle DSL; the closure form version { } must be used
+  - org.openrewrite.gradle.migrate.artifacts.UseVersionClosure
+  # Depending on the current project by its own module coordinates is deprecated in 9.3
+  - org.openrewrite.gradle.migrate.artifacts.UseProjectDependencyInsteadOfModuleCoordinates
+  # DomainObjectCollection.findAll(Closure) is deprecated in 9.4 in favor of matching(Spec)
+  - org.openrewrite.gradle.migrate.tasks.UseMatchingInsteadOfFindAll
+  # Develocity plugin versions before 4.0 rely on the parent-project property lookup deprecated in 9.6
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.gradle.develocity
+      newVersion: 4.x
+  # Earlier versions use dependency-resolution APIs removed in Gradle 9
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: io.spring.dependency-management
+      newVersion: 1.1.7
+  # PMD's targetJdk is deprecated in 9.6 and has no replacement
+  - org.openrewrite.gradle.migrate.quality.RemovePmdTargetJdk
+  # CreateStartScripts.exitEnvironmentVar became a no-op and is deprecated in 9.6
+  - org.openrewrite.gradle.migrate.application.RemoveExitEnvironmentVar
+  # RepositoryHandler.flatDir(Map) / mavenCentral(Map) are deprecated in 9.6 in favor of the Action overloads
+  - org.openrewrite.gradle.migrate.artifacts.UseRepositoryHandlerActionOverloads
+  # The org.gradle.unsafe.isolated-projects* properties are deprecated in 9.7
+  - org.openrewrite.gradle.migrate.properties.MigrateIsolatedProjectsProperties

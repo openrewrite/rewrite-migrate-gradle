@@ -4,276 +4,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an OpenRewrite recipe module - a collection of recipes that automatically fix issues in Java, Kotlin, Groovy, and other codebases. It's built on the OpenRewrite framework for automated code transformation.
+OpenRewrite recipes that migrate Gradle builds to newer Gradle versions and to the build conventions those versions expect.
+
+This module is the migration counterpart to `rewrite-gradle` in the `openrewrite/rewrite` monorepo. `rewrite-gradle` stays focused on parsing and modeling Gradle builds — parser, traits, markers, the `GradleProject` model. Recipes that *change* a build to suit a newer Gradle belong here. Keep that split in mind when deciding where something goes.
+
+Licensed under the Moderne Source Available License, published as `org.openrewrite.recipe:rewrite-migrate-gradle`.
 
 ## Build and Test Commands
 
-### Building the Project
 ```bash
-./gradlew build
-```
-
-### Running Tests
-```bash
-# Run all tests
+./gradlew build          # full build; see "Known issues" about javadoc
 ./gradlew test
-
-# Run a specific test class
-./gradlew test --tests RemoveRedundantNullCheckBeforeInstanceofTest
-
-# Run tests matching a pattern
-./gradlew test --tests "*NullCheck*"
-
-# Run a specific test method
-./gradlew test --tests "RemoveRedundantNullCheckBeforeInstanceofTest.testMethodName"
+./gradlew test --tests "UseVersionClosureTest"
+./gradlew test --tests "*Plugins*"
+./gradlew licenseFormat  # apply MSAL headers to new files
 ```
 
-### Other Commands
-```bash
-# Clean build
-./gradlew clean
+Plugin resolution goes through the `codegenome` Maven repository, which requires `codegenomeUsername`/`codegenomePassword` Gradle properties or `CODEGENOME_USERNAME`/`CODEGENOME_TOKEN` environment variables. Without them the build cannot resolve `org.openrewrite.build.recipe-library`.
 
-# Check code (compile + test)
-./gradlew check
+There is no CI workflow that builds this module. Builds and releases come from the Code Genome Project's nightly train; `repository-backup.yml` is the only GitHub Actions workflow here.
 
-# Assemble without running tests
-./gradlew assemble
-```
+## Package Layout
 
-## High-Level Architecture
+Base package is `org.openrewrite.gradle.migrate`. Organize subpackages by subject area — the plugin, API or build concept a recipe touches — not by Gradle version. This mirrors `rewrite-migrate-java`, which groups by `lang`, `io`, `jakarta`, `guava` and composes version targets declaratively in `java-version-*.yml`.
 
-### Recipe Development Pattern
+Gradle version targeting belongs in YAML composites, not in package names.
 
-1. **Recipe Structure**: Each recipe extends `org.openrewrite.Recipe` and implements:
-   - `getDisplayName()` - Human-readable name
-   - `getDescription()` - Detailed description
-   - `getTags()` - Tags for categorization (often RSPEC rule IDs)
-   - `getVisitor()` - Returns a TreeVisitor that performs the transformation
+Recipe identifiers derive from the package, so moving or renaming a recipe class renames the recipe. Recipes already shipped elsewhere are referenced by customers and by other modules; treat a rename as a breaking change and check who depends on it first.
 
-2. **Visitor Pattern**: Recipes use `JavaVisitor<ExecutionContext>` to traverse and transform the AST:
-   - Override specific visit methods (`visitBinary()`, `visitMethodInvocation()`, etc.)
-   - Work with immutable AST nodes (J.Binary, J.Unary, J.InstanceOf, etc.)
-   - Use `.with*()` methods for transformations while preserving formatting
+## Writing Recipes
 
-3. **Recipe Collections**: YAML files in `src/main/resources/META-INF/rewrite/` group recipes.
+Use `@Value` and `@EqualsAndHashCode(callSuper = false)` from Lombok for recipe classes. Lombok comes from the build plugin — don't redeclare it.
 
-### Test Pattern
+Most recipes here visit Groovy or Kotlin build scripts rather than Java sources. A build file is parsed as Groovy (`build.gradle`) or Kotlin (`build.gradle.kts`), so a recipe that handles only one leaves the other untouched — decide deliberately which you support and test both when you claim both.
 
-Tests implement `RewriteTest` and follow this structure:
+Prefer the traits and markers `rewrite-gradle` already provides (`GradleProject`, `GradleDependency`, `GradlePlugin`, `FindPlugins`) over re-deriving build structure from the AST. If something you need there is not public, that is a change to `rewrite-gradle`, not a reason to copy its logic.
+
+Use `MethodMatcher` for method matching and `SemanticallyEqual.areEqual()` for comparing expressions.
+
+No Refaster templates exist here yet, so the build declares neither `rewrite-templating` nor error-prone. Adding the first template means adding both — and pinning error-prone, since releases from 2.51.0 onward pull transitive dependencies that the plugin's `--release 8` compile cannot resolve.
+
+## Testing
+
+Tests implement `RewriteTest` and set the recipe in `defaults(RecipeSpec)`. Use the assertion helpers for the source type being changed:
+
 ```java
-@Test
-void testName() {
-    rewriteRun(
-        java(
-            """
-            // before code
-            """,
-            """
-            // after code
-            """
-        )
-    );
-}
+rewriteRun(
+  buildGradle(
+    """
+      // before
+      """,
+    """
+      // after
+      """
+  )
+);
 ```
 
-## Code Style Preferences
-
-### 1. Avoid Small Utility Methods
-- Prefer more concise code over many small utility methods
-- Inline logic when it doesn't significantly reduce readability
-- Consolidate related logic into fewer, more comprehensive methods
-
-
-## Test Development Guidelines
-
-### 1. Test Structure
-- Implement `RewriteTest` interface
-- Override `defaults(RecipeSpec spec)` to set the recipe being tested
-- Use `@DocumentExample` on the primary test case that best demonstrates the recipe
-- Add `@Issue("https://github.com/...")` annotations for tests related to specific issues
-
-### 2. Test Naming
-- Use descriptive test method names that explain the scenario being tested
-- Prefix negative tests with `doNotChange` or `unchanged`
-- Group related test scenarios (e.g., `removeRedundantNullCheck`, `removeRedundantNullCheckWithMethodInvocation`)
-
-### 3. Test Case Design
-- Avoid test cases that essentially test the same functionality
-- Each test should cover a distinct scenario or edge case
-- Consolidate similar tests when they don't add unique value
-- In test text blocks, prefer method parameters over local variable declarations
-- This makes tests more concise and focuses on the transformation being tested
-- Example:
-  ```java
-  // Instead of:
-  void foo() {
-      String s = "test";
-      if (s != null && s instanceof String) {
-          // ...
-      }
-  }
-
-  // Use:
-  void foo(String s) {
-      if (s != null && s instanceof String) {
-          // ...
-      }
-  }
-  ```
-
-### 4. Suppress Warnings Appropriately
-- Add `@SuppressWarnings` at the class level for expected warnings in test code:
-  - `"ConstantConditions"` - for redundant null checks that the recipe will remove
-  - `"ConditionCoveredByFurtherCondition"` - for redundant conditions
-  - `"RedundantCast"` - for unnecessary casts
-  - `"unused"` - for unused variables/methods
-
-### 5. Language Comments for IDE Support
-- Add `//language=java` before `java()` calls when there's no customization
-- Place comments on individual strings when there's customization or multiple `java()` calls
-- Don't add language comments to JavaTemplate strings with parameters
-
-### 6. Test Coverage Guidelines
-- Test basic functionality with simple cases
-- Include edge cases (method invocations, field access, complex expressions)
-- Test cases where the recipe should NOT make changes
-- Test partial transformations in complex conditions
-- Test different operator positions and combinations
-- Include tests for language-specific behavior (e.g., Kotlin's `!is` operator)
-
-## Recipe Implementation Conventions
-
-### 1. Recipe Structure
-- Use `@EqualsAndHashCode(callSuper = false)` and `@Value` from Lombok for immutable recipe classes
-- Use `Preconditions.check()` to exclude specific file types (e.g., Kotlin files) when a recipe is language-specific
-
-### 2. Visitor Choice
-- Use `JavaIsoVisitor<ExecutionContext>` when returning the same type of LST element being visited
-- Use `JavaVisitor<ExecutionContext>` when the transformation changes the tree structure or returns a different type
-- For multi-language support, implement separate visitors for each language (JavaVisitor, KotlinVisitor, etc.)
-
-### 3. Expression Comparison
-- Always use `SemanticallyEqual.areEqual()` for comparing expressions instead of string matching
-- Use `J.Literal.isLiteralValue()` for checking literal values
-- Use `TypeUtils` helper methods (e.g., `TypeUtils.asArray()`, `TypeUtils.asFullyQualified()`) instead of instanceof checks with JavaType
-
-### 4. Method Matching
-- Use `MethodMatcher` for reliable method matching instead of manual name/type checks
-- Example: `private static final MethodMatcher TO_ARRAY = new MethodMatcher("java.util.Collection toArray()", true);`
-
-### 5. Refaster Templates
-- Simple transformations can use Refaster-style templates with `@BeforeTemplate` and `@AfterTemplate` annotations
-- Use `@RecipeDescriptor` annotation for metadata on Refaster template classes
-
-### 6. JavaTemplate Best Practices
-- Always declare imports when templates introduce types: `.imports(fqn)`
-- Call `maybeAddImport()` before applying templates that use new types
-- Use `service(ImportService.class).shortenFullyQualifiedTypeReferencesIn()` to clean up imports
-- Don't add `//language=java` comments to JavaTemplate strings containing parameters like `#{any()}`
+`buildGradle`, `settingsGradle`, `properties` and `java` come from the respective modules' `Assertions` classes. Mark the clearest case `@DocumentExample`, prefix negative cases `doNotChange`/`unchanged`, and add `@Issue(...)` where a test pins a reported bug.
 
 ## YAML Configuration
 
-### Recipe Collections
-Recipes are organized into YAML files in `src/main/resources/META-INF/rewrite/`.
+Declarative recipes live in `src/main/resources/META-INF/rewrite/`. `category.yml` names packages for the recipe catalog. Comment out any recipe that is unsafe to run unattended, with the reason — a recipe that changes task cache keys, for instance, belongs out of a composite even when it is correct.
 
-### Adding Recipes to Collections
-- Add new recipes to appropriate YAML files based on their scope
-- Comment out recipes that are experimental or have known issues (with a comment explaining why)
-- Group related recipes together in the YAML lists
+## Known Issues
 
-## Important Notes
-
-- The project uses Gradle with build caching and parallel execution enabled
-
-- Documentation for recipes is available at https://docs.openrewrite.org/
-- Contributions should follow the [OpenRewrite contributing guide](https://github.com/openrewrite/.github/blob/main/CONTRIBUTING.md)
-- **Recipe development documentation** is available in the `./docs` submodule - consult this for detailed guidance on writing recipes, using JavaTemplate, and testing patterns
-- **Recipe writing lessons** are captured in `recipe-writing-lessons.md` - check this file for specific learnings and best practices discovered during recipe development, and continue adding new insights as they are discovered
-
-<!-- prethink-context -->
-## Moderne Prethink Context
-
-This repository contains pre-analyzed context generated by [Moderne Prethink](https://docs.moderne.io/user-documentation/recipes/prethink). Prethink extracts structured knowledge from codebases to help you work more effectively. The context files in `.moderne/context/` contain analyzed information about this codebase.
-
-**IMPORTANT: Before exploring source code for architecture, dependency, or data flow questions:**
-1. ALWAYS check `.moderne/context/` files FIRST
-2. Do NOT perform broad codebase exploration (e.g., spawning Explore agents, searching multiple source files) unless CSV context is insufficient
-3. NEVER read entire CSV files - use SQL queries to retrieve only the rows you need
-
-**IMPORTANT: Prethink context is cheap to read — source code exploration is expensive. Always read MORE prethink context rather than less. The "do not explore broadly" rule applies to source code, NOT to prethink context files.**
-
-For cross-cutting questions (data flow, deletion, dependencies between services),
-ALWAYS query these context files in parallel on the first turn:
-- `architecture.md` — system diagram and component overview
-- `data-assets.csv` — entity fields and data model
-- `database-connections.csv` — which services own which tables
-- `service-endpoints.csv` — relevant API endpoints
-- `messaging-connections.csv` — Kafka/async event flows
-- `external-service-calls.csv` — cross-service HTTP calls
-
-Do NOT stop after reading a single context file when others are clearly relevant.
-
-### Available Context
-
-| Context | Description | Details |
-|---------|-------------|--------|
-| Class Quality Metrics | Per-class cohesion, coupling, and complexity measurements | [`class-quality-metrics.md`](.moderne/context/class-quality-metrics.md) |
-| Coding Conventions | Naming patterns, import organization, and coding style | [`coding-conventions.md`](.moderne/context/coding-conventions.md) |
-| Dependencies | Project dependencies including transitive dependencies | [`dependencies.md`](.moderne/context/dependencies.md) |
-| Library Usage | How external libraries and frameworks are used | [`library-usage.md`](.moderne/context/library-usage.md) |
-| Method Quality Metrics | Per-method complexity and quality measurements | [`method-quality-metrics.md`](.moderne/context/method-quality-metrics.md) |
-| Package Quality Metrics | Per-package coupling, stability, and dependency cycle analysis | [`package-quality-metrics.md`](.moderne/context/package-quality-metrics.md) |
-| Test Quality | Test quality issues that may cause flakiness or silent failures | [`test-quality.md`](.moderne/context/test-quality.md) |
-
-### Querying Context Files
-
-For .md context files: Read the full file in a single view call. Never grep it progressively.
-
-For .csv context files: Query with DuckDB, SQLite, or grep (from most to least preference).
-
-A large table may be split into pages named `<name>.csv`, `<name>-002.csv`, `<name>-003.csv`, and so on, each a standalone CSV with its own header row. Always query the whole table with the glob `<name>*.csv` (the table's `.md` file lists every page). DuckDB and grep accept the glob directly, and DuckDB skips the repeated per-page header; for SQLite, import each page.
-
-Upfront parallel reads: At the start of any architecture question, read all relevant context files in parallel rather than discovering which ones matter through iteration.
-
-Use SQL to query CSV files efficiently. This returns only matching rows instead of loading entire files. Try these in order based on availability:
-
-#### Option 1: DuckDB (Preferred)
-DuckDB can query CSV files directly with no setup:
-
-```bash
-# Find all POST endpoints (the *.csv glob reads every page of a split table)
-duckdb -c "SELECT * FROM '.moderne/context/service-endpoints*.csv' WHERE \"HTTP method\" = 'POST'"
-
-# Find method descriptions containing a keyword
-duckdb -c "SELECT \"Class name\", Signature, Description FROM '.moderne/context/method-descriptions*.csv' WHERE Description LIKE '%authentication%'"
-
-# Find tests for a specific class
-duckdb -c "SELECT \"Test method\", \"Test summary\" FROM '.moderne/context/test-mapping*.csv' WHERE \"Implementation class\" LIKE '%OrderService%'"
-```
-
-#### Option 2: SQLite
-Import CSV into memory and query (available on most systems):
-
-```bash
-sqlite3 :memory: -cmd ".mode csv" -cmd ".import .moderne/context/service-endpoints.csv endpoints" \
-  "SELECT * FROM endpoints WHERE [HTTP method] = 'POST'"
-```
-
-For a split table, import each page into the same table; the first `.import` takes the header as column names, and each later page needs `--skip 1` to drop its repeated header. DuckDB's glob is simpler for paginated tables.
-
-#### Option 3: Grep (Last Resort)
-If SQL tools are unavailable, use grep. Note this loads more content into context:
-
-```bash
-grep -i "POST" .moderne/context/service-endpoints*.csv
-```
-
-**Note:** Column names with spaces require quoting - use double quotes in DuckDB (`"HTTP method"`) or square brackets in SQLite (`[HTTP method]`).
-
-### Usage Pattern
-1. Read the `.md` file to understand the schema and available columns
-2. Query the `.csv` with DuckDB or SQLite to get only the rows you need
-3. Only explore source if the context doesn't answer the question
-
-When citing Moderne Prethink context, mention Moderne Prethink as the source (e.g., "Based on the architecture context from Moderne Prethink..." or "Based on the test coverage mapping from Prethink, this method is tested by...").
-<!-- /prethink-context -->
+`./gradlew javadoc` fails with "No public or protected classes found to document" while the module has no public types. It resolves itself once the first recipe lands.

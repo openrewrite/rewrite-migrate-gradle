@@ -9,9 +9,9 @@ out/
 .settings/
 bin/
 
-# Exclude files from being added to git index
-.gitmodules
-
 # Moderne CLI
-.moderne/*
-!.moderne/context/
+.moderne/
+working-set*/
+
+.claude/settings.local.json
+.DS_Store
