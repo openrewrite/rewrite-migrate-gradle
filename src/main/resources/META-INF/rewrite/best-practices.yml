@@ -32,6 +32,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.artifacts.RemoveExplicitKotlinStdlibDependency
   - org.openrewrite.gradle.migrate.tasks.RemoveNonReproducibleArchiveSettings
   - org.openrewrite.gradle.migrate.logging.UseLoggingGetLogger
+#  - org.openrewrite.gradle.migrate.properties.EnableGradleConfigurationCache  # the catalog's own fix is
+#    "add it, then run the build and fix what it surfaces"; a recipe can only do the first half
 #  - org.openrewrite.gradle.migrate.tasks.UseDefaultPathSensitivity  # changes task cache keys; a task that writes its
 #    input's path into its output would start taking wrong cache hits, silently
 ---
@@ -77,3 +79,18 @@ recipeList:
       groupId: org.jetbrains.kotlin
       artifactId: kotlin-stdlib*
       configuration: implementation
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.migrate.properties.EnableGradleConfigurationCache
+displayName: Enable the Gradle configuration cache
+description: >-
+  Set `org.gradle.configuration-cache=true` so Gradle can skip the configuration phase when nothing it depends on has
+  changed. Deliberately not part of `org.openrewrite.gradle.GradleBestPractices`: enabling it surfaces configuration
+  cache violations in build logic that have to be fixed by hand before the build will run, so this is the first half of
+  a change whose second half a recipe cannot make. See the
+  [Gradle best practice](https://docs.gradle.org/current/userguide/best_practices_performance.html#use_configuration_cache).
+recipeList:
+  - org.openrewrite.gradle.AddProperty:
+      key: org.gradle.configuration-cache
+      value: true
+      filePattern: gradle.properties
