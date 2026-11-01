@@ -1,0 +1,54 @@
+#
+# Copyright 2026 the original author or authors.
+# <p>
+# Licensed under the Moderne Source Available License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://docs.moderne.io/licensing/moderne-source-available-license
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.migrate.GradleBestPractices
+displayName: Apply Gradle best practices
+description: >-
+  Apply the [Gradle best practices](https://docs.gradle.org/current/userguide/best_practices_general.html) that can be
+  applied mechanically. Run alongside `org.openrewrite.gradle.GradleBestPractices`, which carries the practices whose
+  fix was already a recipe in `rewrite-gradle`. Practices whose fix needs a judgement the build files do not contain
+  are deliberately left out, each with its reason below.
+recipeList:
+  - org.openrewrite.gradle.migrate.wrapper.AddGradleWrapperChecksum
+  - org.openrewrite.gradle.migrate.properties.UseUtf8FileEncoding
+  - org.openrewrite.gradle.migrate.settings.AddRootProjectName
+  - org.openrewrite.gradle.migrate.settings.MoveRepositoriesToSettings
+  - org.openrewrite.gradle.migrate.tasks.RemoveNonReproducibleArchiveSettings
+  - org.openrewrite.gradle.migrate.logging.UseLoggingGetLogger
+#  - org.openrewrite.gradle.migrate.tasks.UseDefaultPathSensitivity  # changes task cache keys; a task that writes its
+#    input's path into its output would start taking wrong cache hits, silently
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.migrate.properties.UseUtf8FileEncoding
+displayName: Use UTF-8 file encoding
+description: >-
+  Append `-Dfile.encoding=UTF-8` to `org.gradle.jvmargs` so the build reads and writes text the same way wherever it
+  runs, rather than inheriting whatever default encoding the machine happens to have. Only an existing
+  `org.gradle.jvmargs` is appended to: setting that property replaces Gradle's default daemon arguments rather than
+  adding to them, so creating it to hold only an encoding would drop the default heap and metaspace settings. An
+  encoding already set, UTF-8 or otherwise, is left as it is. See the
+  [Gradle best practice](https://docs.gradle.org/current/userguide/best_practices_performance.html#use_utf8_encoding).
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: '**/gradle.properties'
+recipeList:
+  - org.openrewrite.properties.ChangePropertyValue:
+      propertyKey: org.gradle.jvmargs
+      oldValue: '^(?!.*-Dfile\.encoding).+$'
+      newValue: '$0 -Dfile.encoding=UTF-8'
+      regex: true
