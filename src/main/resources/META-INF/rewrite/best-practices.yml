@@ -32,6 +32,7 @@ recipeList:
   - org.openrewrite.gradle.migrate.artifacts.RemoveExplicitKotlinStdlibDependency
   - org.openrewrite.gradle.migrate.tasks.RemoveNonReproducibleArchiveSettings
   - org.openrewrite.gradle.migrate.logging.UseLoggingGetLogger
+  - org.openrewrite.gradle.migrate.plugins.UsePluginsBlock
 #  - org.openrewrite.gradle.migrate.properties.EnableGradleConfigurationCache  # the catalog's own fix is
 #    "add it, then run the build and fix what it surfaces"; a recipe can only do the first half
 #  - org.openrewrite.gradle.migrate.tasks.UseDefaultPathSensitivity  # changes task cache keys; a task that writes its
