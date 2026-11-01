@@ -28,6 +28,7 @@ recipeList:
   - org.openrewrite.gradle.migrate.properties.UseUtf8FileEncoding
   - org.openrewrite.gradle.migrate.settings.AddRootProjectName
   - org.openrewrite.gradle.migrate.settings.MoveRepositoriesToSettings
+  - org.openrewrite.gradle.migrate.artifacts.RemoveInheritedDependencies
   - org.openrewrite.gradle.migrate.tasks.RemoveNonReproducibleArchiveSettings
   - org.openrewrite.gradle.migrate.logging.UseLoggingGetLogger
 #  - org.openrewrite.gradle.migrate.tasks.UseDefaultPathSensitivity  # changes task cache keys; a task that writes its
