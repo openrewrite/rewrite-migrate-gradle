@@ -450,6 +450,26 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
     }
 
     @Test
+    void doNotChangeWarProject() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'war'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotRemovePluginUsedByAnotherBuildScript() {
         rewriteRun(
           buildGradle(

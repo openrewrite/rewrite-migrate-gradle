@@ -137,6 +137,10 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     !findInvocations(cu, "publishing").isEmpty()) {
                     return cu;
                 }
+                // `uploadArchives` deployed the war or ear in place of the jar that `components.java` publishes
+                if (appliesPlugin(cu, "war") || appliesPlugin(cu, "ear")) {
+                    return cu;
+                }
                 J.MethodInvocation upload = uploads.get(0);
                 Deployment deployment = Deployment.of(upload);
                 if (deployment == null) {
