@@ -450,6 +450,11 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         @Nullable
         Repository snapshot;
 
+        @Nullable
+        Expression snapshotCondition;
+
+        boolean snapshotWhenTrue;
+
         J.@Nullable Block pom;
 
         boolean signPom;
@@ -485,7 +490,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
 
         private boolean accept(Statement s) {
             if (s instanceof J.If) {
-                // `if (version.endsWith('SNAPSHOT')) { snapshotRepository(..) } else { repository(..) }`
+                // `if (..) { snapshotRepository(..) } else { repository(..) }`, or the other way around
                 J.If iff = (J.If) s;
                 if (iff.getElsePart() == null || !(iff.getThenPart() instanceof J.Block) ||
                     !(iff.getElsePart().getBody() instanceof J.Block)) {
@@ -493,9 +498,15 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 }
                 J.Block then = (J.Block) iff.getThenPart();
                 J.Block otherwise = (J.Block) iff.getElsePart().getBody();
-                return then.getStatements().size() == 1 && otherwise.getStatements().size() == 1 &&
-                       isRepository(then.getStatements().get(0)) && isRepository(otherwise.getStatements().get(0)) &&
-                       accept(then.getStatements().get(0)) && accept(otherwise.getStatements().get(0));
+                if (then.getStatements().size() != 1 || otherwise.getStatements().size() != 1 ||
+                    !isRepository(then.getStatements().get(0)) || !isRepository(otherwise.getStatements().get(0)) ||
+                    !accept(then.getStatements().get(0)) || !accept(otherwise.getStatements().get(0))) {
+                    return false;
+                }
+                snapshotCondition = iff.getIfCondition().getTree();
+                J.MethodInvocation thenRepository = asInvocation(then.getStatements().get(0));
+                snapshotWhenTrue = thenRepository != null && "snapshotRepository".equals(thenRepository.getSimpleName());
+                return true;
             }
             J.MethodInvocation m = asInvocation(s);
             if (m == null) {
@@ -676,14 +687,24 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         }
 
         /**
-         * `mavenDeployer` deploys a `-SNAPSHOT` version to the snapshot repository when it has one.
+         * `mavenDeployer` deploys a `-SNAPSHOT` version to the snapshot repository when it has one, unless the
+         * build itself chose between the repositories with an `if`.
          */
-        private static String choose(Expression forRelease, @Nullable Expression forSnapshot, Cursor cursor) {
+        private String choose(Expression forRelease, @Nullable Expression forSnapshot, Cursor cursor) {
             String rel = forRelease.printTrimmed(cursor);
             if (forSnapshot == null || SemanticallyEqual.areEqual(forRelease, forSnapshot)) {
                 return rel;
             }
-            return "version.toString().endsWith('SNAPSHOT') ? " + forSnapshot.printTrimmed(cursor) + " : " + rel;
+            String snap = forSnapshot.printTrimmed(cursor);
+            if (snapshotCondition == null) {
+                return "version.toString().endsWith('SNAPSHOT') ? " + snap + " : " + rel;
+            }
+            String condition = snapshotCondition.printTrimmed(cursor);
+            if (!(snapshotCondition instanceof J.MethodInvocation || snapshotCondition instanceof J.Identifier ||
+                  snapshotCondition instanceof J.FieldAccess)) {
+                condition = "(" + condition + ")";
+            }
+            return snapshotWhenTrue ? condition + " ? " + snap + " : " + rel : condition + " ? " + rel + " : " + snap;
         }
     }
 

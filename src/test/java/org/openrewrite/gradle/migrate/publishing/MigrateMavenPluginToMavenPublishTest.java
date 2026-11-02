@@ -237,11 +237,52 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
                   }
                   repositories {
                       maven {
-                          url = version.toString().endsWith('SNAPSHOT') ? snapshotsUrl : releasesUrl
+                          url = project.version.endsWith('-SNAPSHOT') ? snapshotsUrl : releasesUrl
                           credentials {
-                              username = version.toString().endsWith('SNAPSHOT') ? snapshotsUser : releasesUser
-                              password = version.toString().endsWith('SNAPSHOT') ? snapshotsPassword : releasesPassword
+                              username = project.version.endsWith('-SNAPSHOT') ? snapshotsUser : releasesUser
+                              password = project.version.endsWith('-SNAPSHOT') ? snapshotsPassword : releasesPassword
                           }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryChosenByOtherCondition() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          if (project.hasProperty('internal')) {
+                              repository(url: internalUrl)
+                          } else {
+                              snapshotRepository(url: publicUrl)
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven-publish'
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                      }
+                  }
+                  repositories {
+                      maven {
+                          url = project.hasProperty('internal') ? internalUrl : publicUrl
                       }
                   }
               }
