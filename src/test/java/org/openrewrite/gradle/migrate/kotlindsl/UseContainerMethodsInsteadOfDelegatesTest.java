@@ -208,6 +208,73 @@ class UseContainerMethodsInsteadOfDelegatesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void kotlinMultiplatformSourceSets() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              kotlin {
+                  sourceSets {
+                      val commonMain by getting {
+                          dependencies {
+                              implementation("org.example:lib:1.0")
+                          }
+                      }
+                      val jvmTest by getting
+                  }
+              }
+              """,
+            """
+              kotlin {
+                  sourceSets {
+                      val commonMain = getByName("commonMain") {
+                          dependencies {
+                              implementation("org.example:lib:1.0")
+                          }
+                      }
+                      val jvmTest = getByName("jvmTest")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsReceiverOnItsOwnLine() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              val pythonSetupVenv by project.tasks
+                  .registering(Exec::class) {
+                      commandLine("python3", "-m", "venv", ".venv")
+                  }
+              """,
+            """
+              val pythonSetupVenv = project.tasks
+                  .register<Exec>("pythonSetupVenv") {
+                      commandLine("python3", "-m", "venv", ".venv")
+                  }
+              """
+          )
+        );
+    }
+
+    @Test
+    void precompiledScriptPlugin() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              val aggregate by tasks.registering
+              """,
+            """
+              val aggregate = tasks.register("aggregate")
+              """,
+            spec -> spec.path("buildSrc/src/main/kotlin/my-convention.gradle.kts")
+          )
+        );
+    }
+
     @Nested
     class NoChange {
 
@@ -231,6 +298,19 @@ class UseContainerMethodsInsteadOfDelegatesTest implements RewriteTest {
                 """
                   val signingKey: String? by project
                   val greeting by lazy { "hello" }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void javaClassArgument() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  val listFiles by tasks.creating(Exec::class.java) {
+                      commandLine("ls")
+                  }
                   """
               )
             );

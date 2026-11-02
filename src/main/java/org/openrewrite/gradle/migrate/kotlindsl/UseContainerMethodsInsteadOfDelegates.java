@@ -86,7 +86,7 @@ public class UseContainerMethodsInsteadOfDelegates extends Recipe {
 
     @Value
     private static class Delegate {
-        @Nullable Expression container;
+        @Nullable JRightPadded<Expression> container;
 
         String method;
 
@@ -99,7 +99,8 @@ public class UseContainerMethodsInsteadOfDelegates extends Recipe {
                 return from(null, (J.Identifier) initializer, null, null);
             } else if (initializer instanceof J.FieldAccess) {
                 J.FieldAccess fieldAccess = (J.FieldAccess) initializer;
-                return from(fieldAccess.getTarget(), fieldAccess.getName(), null, null);
+                return from(JRightPadded.build(fieldAccess.getTarget()).withAfter(fieldAccess.getPadding().getName().getBefore()),
+                        fieldAccess.getName(), null, null);
             } else if (initializer instanceof J.MethodInvocation) {
                 J.MethodInvocation invocation = (J.MethodInvocation) initializer;
                 if (invocation.getTypeParameters() != null) {
@@ -118,12 +119,12 @@ public class UseContainerMethodsInsteadOfDelegates extends Recipe {
                 if (arguments.size() > 1 || (arguments.size() == 1 && !(arguments.get(0).getElement() instanceof J.Lambda))) {
                     return null;
                 }
-                return from(invocation.getSelect(), invocation.getName(), type, arguments.isEmpty() ? null : arguments.get(0));
+                return from(invocation.getPadding().getSelect(), invocation.getName(), type, arguments.isEmpty() ? null : arguments.get(0));
             }
             return null;
         }
 
-        private static @Nullable Delegate from(@Nullable Expression container, J.Identifier name,
+        private static @Nullable Delegate from(@Nullable JRightPadded<Expression> container, J.Identifier name,
                                                @Nullable Expression type, @Nullable JRightPadded<Expression> configuration) {
             String method = DELEGATE_TO_METHOD.get(name.getSimpleName());
             return method == null ? null : new Delegate(container, method, type, configuration);
@@ -139,9 +140,13 @@ public class UseContainerMethodsInsteadOfDelegates extends Recipe {
             String escapedName = elementName.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$");
             String call = method + typeArgument + "(\"" + escapedName + "\")";
             Expression initializer = initializerCursor.getValue();
-            J.MethodInvocation containerCall = container == null ?
-                    KotlinTemplate.apply(call, initializerCursor, initializer.getCoordinates().replace()) :
-                    KotlinTemplate.apply("#{any()}." + call, initializerCursor, initializer.getCoordinates().replace(), container);
+            J.MethodInvocation containerCall;
+            if (container == null) {
+                containerCall = KotlinTemplate.apply(call, initializerCursor, initializer.getCoordinates().replace());
+            } else {
+                containerCall = KotlinTemplate.<J.MethodInvocation>apply("#{any()}." + call, initializerCursor,
+                        initializer.getCoordinates().replace(), container.getElement()).getPadding().withSelect(container);
+            }
             if (configuration == null) {
                 return containerCall;
             }
