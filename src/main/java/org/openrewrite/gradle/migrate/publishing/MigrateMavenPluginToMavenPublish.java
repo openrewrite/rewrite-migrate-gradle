@@ -39,11 +39,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.singletonList;
@@ -171,8 +167,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
     }
 
     private static boolean appliesPlugin(G.CompilationUnit cu, String pluginId) {
-        AtomicBoolean found = new AtomicBoolean();
-        new JavaIsoVisitor<AtomicBoolean>() {
+        return new JavaIsoVisitor<AtomicBoolean>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
                 if (pluginLiteral(method, getCursor(), pluginId) != null) {
@@ -180,8 +175,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 }
                 return super.visitMethodInvocation(method, f);
             }
-        }.visit(cu, found);
-        return found.get();
+        }.reduce(cu, new AtomicBoolean()).get();
     }
 
     /**
@@ -210,8 +204,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
      * The name `uploadArchives` passed to `gradle.taskGraph.hasTask(..)` is not a use: it is rewritten.
      */
     private static boolean usesLegacyPlugin(G.CompilationUnit cu, J.@Nullable MethodInvocation except) {
-        AtomicBoolean found = new AtomicBoolean();
-        new JavaIsoVisitor<AtomicBoolean>() {
+        return new JavaIsoVisitor<AtomicBoolean>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
                 if (except != null && method.getId().equals(except.getId())) {
@@ -236,8 +229,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 }
                 return literal;
             }
-        }.visit(cu, found);
-        return found.get();
+        }.reduce(cu, new AtomicBoolean()).get();
     }
 
     private static boolean isHasTaskArgument(Cursor literalCursor) {
@@ -246,8 +238,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
     }
 
     private static List<J.MethodInvocation> findInvocations(G.CompilationUnit cu, String name) {
-        List<J.MethodInvocation> found = new ArrayList<>();
-        new JavaIsoVisitor<List<J.MethodInvocation>>() {
+        return new JavaIsoVisitor<List<J.MethodInvocation>>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<J.MethodInvocation> f) {
                 if (name.equals(method.getSimpleName()) && method.getSelect() == null) {
@@ -255,16 +246,14 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 }
                 return super.visitMethodInvocation(method, f);
             }
-        }.visit(cu, found);
-        return found;
+        }.reduce(cu, new ArrayList<>());
     }
 
     /**
      * Whether a `signing { }` block signs the `archives` configuration, which `uploadArchives` deployed the signatures of.
      */
     private static boolean signsArchives(G.CompilationUnit cu) {
-        AtomicBoolean found = new AtomicBoolean();
-        new JavaIsoVisitor<AtomicBoolean>() {
+        return new JavaIsoVisitor<AtomicBoolean>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
                 if (isSignArchives(method, getCursor())) {
@@ -272,8 +261,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 }
                 return super.visitMethodInvocation(method, f);
             }
-        }.visit(cu, found);
-        return found.get();
+        }.reduce(cu, new AtomicBoolean()).get();
     }
 
     private static boolean isSignArchives(J.MethodInvocation m, Cursor cursor) {
