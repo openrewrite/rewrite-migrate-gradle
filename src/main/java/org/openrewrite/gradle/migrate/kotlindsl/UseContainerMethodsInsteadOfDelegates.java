@@ -18,16 +18,18 @@ package org.openrewrite.gradle.migrate.kotlindsl;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.java.marker.OmitParentheses;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.marker.By;
-import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -68,89 +69,81 @@ public class UseContainerMethodsInsteadOfDelegates extends Recipe {
                     return vd;
                 }
                 J.VariableDeclarations.NamedVariable variable = vd.getVariables().get(0);
-                J.MethodInvocation call = containerCall(variable.getInitializer(), variable.getSimpleName());
-                if (call == null) {
+                Expression initializer = variable.getInitializer();
+                Delegate delegate = initializer == null ? null : Delegate.from(initializer);
+                if (delegate == null) {
                     return vd;
                 }
+                Cursor initializerCursor = new Cursor(new Cursor(getCursor(), variable), initializer);
                 return vd.withMarkers(vd.getMarkers().removeByType(By.class))
-                        .withVariables(singletonList(variable.withInitializer(call)));
+                        .withVariables(singletonList(variable.withInitializer(
+                                delegate.toContainerCall(initializerCursor, variable.getSimpleName()))));
             }
         });
     }
 
-    private static J.@Nullable MethodInvocation containerCall(@Nullable Expression delegate, String elementName) {
-        if (delegate instanceof J.Identifier) {
-            J.Identifier identifier = (J.Identifier) delegate;
-            String method = DELEGATE_TO_METHOD.get(identifier.getSimpleName());
-            if (method == null) {
-                return null;
-            }
-            return new J.MethodInvocation(randomId(), identifier.getPrefix(), Markers.EMPTY, null, null,
-                    rename(identifier.withPrefix(Space.EMPTY), method),
-                    JContainer.build(singletonList(JRightPadded.build(stringLiteral(elementName)))), null);
-        } else if (delegate instanceof J.FieldAccess) {
-            J.FieldAccess fieldAccess = (J.FieldAccess) delegate;
-            String method = DELEGATE_TO_METHOD.get(fieldAccess.getSimpleName());
-            if (method == null) {
-                return null;
-            }
-            return new J.MethodInvocation(randomId(), fieldAccess.getPrefix(), Markers.EMPTY,
-                    JRightPadded.build(fieldAccess.getTarget()).withAfter(fieldAccess.getPadding().getName().getBefore()),
-                    null,
-                    rename(fieldAccess.getName(), method),
-                    JContainer.build(singletonList(JRightPadded.build(stringLiteral(elementName)))), null);
-        } else if (delegate instanceof J.MethodInvocation) {
-            J.MethodInvocation invocation = (J.MethodInvocation) delegate;
-            String method = DELEGATE_TO_METHOD.get(invocation.getSimpleName());
-            if (method == null || invocation.getTypeParameters() != null) {
-                return null;
-            }
-            return elementCall(invocation, method, elementName);
-        }
-        return null;
-    }
+    @Value
+    private static class Delegate {
+        @Nullable Expression container;
+        String method;
+        @Nullable Expression type;
+        @Nullable JRightPadded<Expression> configuration;
 
-    private static J.@Nullable MethodInvocation elementCall(J.MethodInvocation delegate, String method, String elementName) {
-        JContainer<Expression> arguments = delegate.getPadding().getArguments();
-        List<JRightPadded<Expression>> remaining = new ArrayList<>();
-        for (JRightPadded<Expression> argument : arguments.getPadding().getElements()) {
-            if (!(argument.getElement() instanceof J.Empty)) {
-                remaining.add(argument);
+        static @Nullable Delegate from(Expression initializer) {
+            if (initializer instanceof J.Identifier) {
+                return from(null, (J.Identifier) initializer, null, null);
+            } else if (initializer instanceof J.FieldAccess) {
+                J.FieldAccess fieldAccess = (J.FieldAccess) initializer;
+                return from(fieldAccess.getTarget(), fieldAccess.getName(), null, null);
+            } else if (initializer instanceof J.MethodInvocation) {
+                J.MethodInvocation invocation = (J.MethodInvocation) initializer;
+                if (invocation.getTypeParameters() != null) {
+                    return null;
+                }
+                List<JRightPadded<Expression>> arguments = new ArrayList<>();
+                for (JRightPadded<Expression> argument : invocation.getPadding().getArguments().getPadding().getElements()) {
+                    if (!(argument.getElement() instanceof J.Empty)) {
+                        arguments.add(argument);
+                    }
+                }
+                Expression type = null;
+                if (!arguments.isEmpty() && isClassLiteral(arguments.get(0).getElement())) {
+                    type = ((J.MemberReference) arguments.remove(0).getElement()).getContaining();
+                }
+                if (arguments.size() > 1 || (arguments.size() == 1 && !(arguments.get(0).getElement() instanceof J.Lambda))) {
+                    return null;
+                }
+                return from(invocation.getSelect(), invocation.getName(), type, arguments.isEmpty() ? null : arguments.get(0));
             }
-        }
-
-        JContainer<Expression> typeParameters = null;
-        if (!remaining.isEmpty() && isClassLiteral(remaining.get(0).getElement())) {
-            Expression type = ((J.MemberReference) remaining.remove(0).getElement()).getContaining();
-            typeParameters = JContainer.build(singletonList(JRightPadded.build(type.withPrefix(Space.EMPTY))));
-        }
-        if (remaining.size() > 1 || (remaining.size() == 1 && !(remaining.get(0).getElement() instanceof J.Lambda))) {
             return null;
         }
 
-        List<JRightPadded<Expression>> newArguments = new ArrayList<>();
-        newArguments.add(JRightPadded.build(stringLiteral(elementName)));
-        newArguments.addAll(remaining);
-        return delegate
-                .withName(rename(delegate.getName(), method))
-                .withMethodType(null)
-                .getPadding().withTypeParameters(typeParameters)
-                .getPadding().withArguments(arguments
-                        .withMarkers(arguments.getMarkers().removeByType(OmitParentheses.class))
-                        .getPadding().withElements(newArguments));
-    }
+        private static @Nullable Delegate from(@Nullable Expression container, J.Identifier name,
+                                               @Nullable Expression type, @Nullable JRightPadded<Expression> configuration) {
+            String method = DELEGATE_TO_METHOD.get(name.getSimpleName());
+            return method == null ? null : new Delegate(container, method, type, configuration);
+        }
 
-    private static boolean isClassLiteral(Expression expression) {
-        return expression instanceof J.MemberReference &&
-                "class".equals(((J.MemberReference) expression).getReference().getSimpleName());
-    }
+        private static boolean isClassLiteral(Expression expression) {
+            return expression instanceof J.MemberReference &&
+                    "class".equals(((J.MemberReference) expression).getReference().getSimpleName());
+        }
 
-    private static J.Identifier rename(J.Identifier name, String method) {
-        return name.withSimpleName(method).withType(null).withFieldType(null);
-    }
-
-    private static J.Literal stringLiteral(String value) {
-        String escaped = value.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$");
-        return new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, "\"" + escaped + "\"", null, JavaType.Primitive.String);
+        J.MethodInvocation toContainerCall(Cursor initializerCursor, String elementName) {
+            String typeArgument = type == null ? "" : "<" + type.printTrimmed(initializerCursor) + ">";
+            String escapedName = elementName.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$");
+            String call = method + typeArgument + "(\"" + escapedName + "\")";
+            Expression initializer = initializerCursor.getValue();
+            J.MethodInvocation containerCall = container == null ?
+                    KotlinTemplate.apply(call, initializerCursor, initializer.getCoordinates().replace()) :
+                    KotlinTemplate.apply("#{any()}." + call, initializerCursor, initializer.getCoordinates().replace(), container);
+            if (configuration == null) {
+                return containerCall;
+            }
+            List<JRightPadded<Expression>> arguments = new ArrayList<>(containerCall.getPadding().getArguments().getPadding().getElements());
+            arguments.add(configuration);
+            return containerCall.getPadding().withArguments(
+                    containerCall.getPadding().getArguments().getPadding().withElements(arguments));
+        }
     }
 }
