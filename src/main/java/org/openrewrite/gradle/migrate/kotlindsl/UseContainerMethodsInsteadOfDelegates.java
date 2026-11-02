@@ -24,8 +24,10 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinTemplate;
@@ -85,8 +87,11 @@ public class UseContainerMethodsInsteadOfDelegates extends Recipe {
     @Value
     private static class Delegate {
         @Nullable Expression container;
+
         String method;
+
         @Nullable Expression type;
+
         @Nullable JRightPadded<Expression> configuration;
 
         static @Nullable Delegate from(Expression initializer) {
@@ -140,10 +145,9 @@ public class UseContainerMethodsInsteadOfDelegates extends Recipe {
             if (configuration == null) {
                 return containerCall;
             }
-            List<JRightPadded<Expression>> arguments = new ArrayList<>(containerCall.getPadding().getArguments().getPadding().getElements());
-            arguments.add(configuration);
-            return containerCall.getPadding().withArguments(
-                    containerCall.getPadding().getArguments().getPadding().withElements(arguments));
+            JContainer<Expression> arguments = containerCall.getPadding().getArguments();
+            return containerCall.getPadding().withArguments(arguments.getPadding().withElements(
+                    ListUtils.concat(arguments.getPadding().getElements(), configuration)));
         }
     }
 }
