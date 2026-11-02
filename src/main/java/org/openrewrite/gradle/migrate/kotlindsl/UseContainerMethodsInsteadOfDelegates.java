@@ -59,6 +59,7 @@ public class UseContainerMethodsInsteadOfDelegates extends Recipe {
             "scheduled for removal in Gradle 10. Replace them with explicit calls to `register`, `create`, `named` and `getByName`, " +
             "passing the property name as the element name and a `Type::class` argument as a type argument. " +
             "This applies to any named container, such as `tasks`, `configurations` and `sourceSets`. " +
+            "Property delegates such as `by project` and `by extra` are left unchanged. " +
             "See the [Gradle upgrade guide](https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties) for more information.";
 
     @Override
