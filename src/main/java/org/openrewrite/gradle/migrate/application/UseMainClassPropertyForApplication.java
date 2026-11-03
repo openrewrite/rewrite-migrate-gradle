@@ -22,7 +22,10 @@ import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 

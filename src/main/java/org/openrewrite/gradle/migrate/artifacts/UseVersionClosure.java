@@ -35,17 +35,11 @@ import static java.util.Collections.singletonList;
 @EqualsAndHashCode(callSuper = false)
 public class UseVersionClosure extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Use `version { }` closure instead of `version = { }` assignment";
-    }
+    String displayName = "Use `version { }` closure instead of `version = { }` assignment";
 
-    @Override
-    public String getDescription() {
-        return "Converts `version = { ... }` assignment syntax to `version { ... }` closure call syntax " +
-                "in Gradle dependency declarations. The assignment form is not valid Gradle DSL; " +
-                "the closure form invokes the version spec method directly.";
-    }
+    String description = "Converts `version = { ... }` assignment syntax to `version { ... }` closure call syntax " +
+            "in Gradle dependency declarations. The assignment form is not valid Gradle DSL; " +
+            "the closure form invokes the version spec method directly.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

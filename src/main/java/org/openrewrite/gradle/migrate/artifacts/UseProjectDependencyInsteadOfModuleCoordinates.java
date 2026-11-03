@@ -28,7 +28,7 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.tree.Expression;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
 
 public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
@@ -114,6 +114,6 @@ public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
 
     private static String projectPath(GradleProject gp) {
         String path = gp.getPath();
-        return path == null || path.isEmpty() ? ":" : path;
+        return StringUtils.isNullOrEmpty( path ) ? ":" : path;
     }
 }
