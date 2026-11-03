@@ -73,6 +73,19 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
             "relocation", "mailingLists", "mailingList"));
 
     /**
+     * Methods whose string arguments name tasks.
+     */
+    private static final Set<String> TASK_REFERENCES = new HashSet<>(Arrays.asList(
+            "defaultTasks", "dependsOn", "finalizedBy", "mustRunAfter", "shouldRunAfter",
+            "named", "getByName", "findByName", "getByPath", "findByPath", "hasTask"));
+
+    /**
+     * Blocks that configure other projects than the one the script belongs to.
+     */
+    private static final Set<String> SHARED_CONFIGURATION = new HashSet<>(Arrays.asList(
+            "subprojects", "allprojects", "configure"));
+
+    /**
      * Collection properties that cannot take the single value the legacy syntax passed.
      */
     private static final Set<String> POM_COLLECTION_PROPERTIES = new HashSet<>(Arrays.asList(
@@ -133,7 +146,8 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     return (G.CompilationUnit) new PluginVisitor(false).visitNonNull(cu, ctx);
                 }
 
-                if (uploads.size() > 1 || usesLegacyPlugin(cu, uploads.get(0)) ||
+                // Another script that uses the plugin would keep its `uploadArchives` while this one moves on
+                if (usedElsewhere.get() || uploads.size() > 1 || usesLegacyPlugin(cu, uploads.get(0)) ||
                     !findInvocations(cu, "publishing").isEmpty()) {
                     return cu;
                 }
@@ -141,9 +155,19 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 if (appliesPlugin(cu, "war") || appliesPlugin(cu, "ear")) {
                     return cu;
                 }
+                // Without the Java plugin there is no `components.java` to publish
+                if (!appliesPlugin(cu, "java") && !appliesPlugin(cu, "java-library")) {
+                    return cu;
+                }
                 J.MethodInvocation upload = uploads.get(0);
                 Deployment deployment = Deployment.of(upload);
                 if (deployment == null) {
+                    return cu;
+                }
+                // `mavenDeployer` chose the snapshot repository when publishing, the ternary does so while the
+                // block is configured: in a shared block that is before a subproject sets its own version
+                if (deployment.snapshot != null && deployment.snapshotCondition == null &&
+                    (isInSharedConfiguration(cu, upload) || setsVersionAfter(cu, upload))) {
                     return cu;
                 }
                 boolean signsArchives = signsArchives(cu);
@@ -210,14 +234,6 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
     private static boolean usesLegacyPlugin(G.CompilationUnit cu, J.@Nullable MethodInvocation except) {
         return new JavaIsoVisitor<AtomicBoolean>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
-                if (except != null && method.getId().equals(except.getId())) {
-                    return method;
-                }
-                return super.visitMethodInvocation(method, f);
-            }
-
-            @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean f) {
                 if (LEGACY_NAMES.contains(identifier.getSimpleName())) {
                     f.set(true);
@@ -226,14 +242,127 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
             }
 
             @Override
-            public J.Literal visitLiteral(J.Literal literal, AtomicBoolean f) {
-                if (literal.getValue() instanceof String && ((String) literal.getValue()).contains("uploadArchives") &&
-                    !isHasTaskArgument(getCursor())) {
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
+                if (except != null && method.getId().equals(except.getId())) {
+                    return method;
+                }
+                // `pom { project { .. } }.writeTo(..)`: the plugin's POM factory, unlike `pom { }` in a publication
+                if ("pom".equals(method.getSimpleName()) && method.getSelect() == null && !isInPublishing(getCursor())) {
                     f.set(true);
+                }
+                return super.visitMethodInvocation(method, f);
+            }
+
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, AtomicBoolean f) {
+                if (literal.getValue() instanceof String) {
+                    String value = (String) literal.getValue();
+                    if (value.contains("uploadArchives") && !isHasTaskArgument(getCursor()) ||
+                        ("install".equals(value) || value.endsWith(":install")) && isTaskReference(getCursor())) {
+                        f.set(true);
+                    }
                 }
                 return literal;
             }
         }.reduce(cu, new AtomicBoolean()).get();
+    }
+
+    /**
+     * Whether the script sets the project version after the invocation, as in `version = '1.0-SNAPSHOT'` at the
+     * end of the script, so that the version is not known yet where the invocation is evaluated.
+     */
+    private static boolean setsVersionAfter(G.CompilationUnit cu, J.MethodInvocation m) {
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            boolean after;
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
+                if (method.getId().equals(m.getId())) {
+                    after = true;
+                    return method;
+                }
+                if (after && "version".equals(method.getSimpleName()) && method.getArguments().size() == 1 &&
+                    (method.getSelect() == null || isProject(method.getSelect()))) {
+                    f.set(true);
+                }
+                return super.visitMethodInvocation(method, f);
+            }
+
+            @Override
+            public J.Assignment visitAssignment(J.Assignment assignment, AtomicBoolean f) {
+                Expression variable = assignment.getVariable();
+                if (after && (variable instanceof J.Identifier && "version".equals(((J.Identifier) variable).getSimpleName()) ||
+                              variable instanceof J.FieldAccess && "version".equals(((J.FieldAccess) variable).getSimpleName()) &&
+                              isProject(((J.FieldAccess) variable).getTarget()))) {
+                    f.set(true);
+                }
+                return super.visitAssignment(assignment, f);
+            }
+
+            private boolean isProject(Expression e) {
+                return e instanceof J.Identifier && "project".equals(((J.Identifier) e).getSimpleName());
+            }
+        }.reduce(cu, new AtomicBoolean()).get();
+    }
+
+    /**
+     * Whether the invocation sits in a block that configures other projects, such as `subprojects { }`.
+     */
+    private static boolean isInSharedConfiguration(G.CompilationUnit cu, J.MethodInvocation m) {
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
+                if (method.getId().equals(m.getId())) {
+                    getCursor().getPathAsStream()
+                            .filter(J.MethodInvocation.class::isInstance)
+                            .map(J.MethodInvocation.class::cast)
+                            .filter(enclosing -> SHARED_CONFIGURATION.contains(enclosing.getSimpleName()))
+                            .findAny()
+                            .ifPresent(enclosing -> f.set(true));
+                    return method;
+                }
+                return super.visitMethodInvocation(method, f);
+            }
+        }.reduce(cu, new AtomicBoolean()).get();
+    }
+
+    /**
+     * Whether the cursor is in the configuration of a `maven-publish` publication: in `publishing { }`, or in a
+     * call on `publishing.publications`, such as `publishing.publications.withType(MavenPublication) { }`.
+     */
+    private static boolean isInPublishing(Cursor cursor) {
+        return cursor.getPathAsStream()
+                .filter(J.MethodInvocation.class::isInstance)
+                .map(J.MethodInvocation.class::cast)
+                .anyMatch(m -> isPublishingName(m.getSimpleName()) || refersToPublishing(m.getSelect()));
+    }
+
+    private static boolean refersToPublishing(@Nullable Expression select) {
+        if (select instanceof J.Identifier) {
+            return isPublishingName(((J.Identifier) select).getSimpleName());
+        }
+        if (select instanceof J.FieldAccess) {
+            J.FieldAccess fieldAccess = (J.FieldAccess) select;
+            return isPublishingName(fieldAccess.getSimpleName()) || refersToPublishing(fieldAccess.getTarget());
+        }
+        if (select instanceof J.MethodInvocation) {
+            J.MethodInvocation m = (J.MethodInvocation) select;
+            return isPublishingName(m.getSimpleName()) || refersToPublishing(m.getSelect());
+        }
+        return false;
+    }
+
+    private static boolean isPublishingName(String name) {
+        return "publishing".equals(name) || "publications".equals(name);
+    }
+
+    /**
+     * Whether the literal names a task, as in `defaultTasks 'clean', 'install'` or `tasks.named('install')`, rather
+     * than being any string that happens to read `install`, such as a file name or a command line argument.
+     */
+    private static boolean isTaskReference(Cursor literalCursor) {
+        J.MethodInvocation enclosing = literalCursor.firstEnclosing(J.MethodInvocation.class);
+        return enclosing != null && TASK_REFERENCES.contains(enclosing.getSimpleName());
     }
 
     private static boolean isHasTaskArgument(Cursor literalCursor) {

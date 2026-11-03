@@ -549,4 +549,278 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeMavenAndKeepPublicationPom() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+              apply plugin: 'maven-publish'
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                          pom {
+                              name = 'example'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven-publish'
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                          pom {
+                              name = 'example'
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeWithoutJavaPlugin() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'base'
+              apply plugin: 'maven'
+
+              task dist(type: Zip) {
+                  from 'src/dist'
+              }
+
+              artifacts {
+                  archives dist
+              }
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRemovePluginWhenPomFactoryIsUsed() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              task writePom {
+                  doLast {
+                      pom {
+                          project {
+                              name 'example'
+                          }
+                      }.writeTo("$buildDir/pom.xml")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRemovePluginWhenInstallTaskIsNamed() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              defaultTasks 'clean', 'install'
+              """
+          ),
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              tasks.named('install') {
+                  enabled = false
+              }
+              """,
+            spec -> spec.path("library/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void doNotConvertWhenAnotherBuildScriptUsesThePlugin() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects {
+                  apply plugin: 'java'
+                  apply plugin: 'maven'
+
+                  uploadArchives {
+                      repositories {
+                          mavenDeployer {
+                              repository(url: "https://repo.example.org/releases")
+                          }
+                      }
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          pom.project {
+                              name 'library'
+                          }
+                      }
+                  }
+              }
+              """,
+            spec -> spec.path("library/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void doNotChooseSnapshotRepositoryByVersionInSharedConfiguration() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects {
+                  apply plugin: 'java'
+                  apply plugin: 'maven'
+
+                  uploadArchives {
+                      repositories {
+                          mavenDeployer {
+                              repository(url: "https://repo.example.org/releases")
+                              snapshotRepository(url: "https://repo.example.org/snapshots")
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void migrateDespiteUnrelatedInstallString() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              task dist(type: Zip) {
+                  from('src/dist') {
+                      exclude 'install'
+                  }
+              }
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
+              """,
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven-publish'
+
+              task dist(type: Zip) {
+                  from('src/dist') {
+                      exclude 'install'
+                  }
+              }
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                      }
+                  }
+                  repositories {
+                      maven {
+                          url = "https://repo.example.org/releases"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeMavenAndKeepPomOfPublicationsByType() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+              apply plugin: 'maven-publish'
+
+              publishing.publications.withType(MavenPublication) {
+                  pom {
+                      name = 'example'
+                  }
+              }
+              """,
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven-publish'
+
+              publishing.publications.withType(MavenPublication) {
+                  pom {
+                      name = 'example'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChooseSnapshotRepositoryByVersionSetLater() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases")
+                          snapshotRepository(url: "https://repo.example.org/snapshots")
+                      }
+                  }
+              }
+
+              version = '1.0-SNAPSHOT'
+              """
+          )
+        );
+    }
 }
