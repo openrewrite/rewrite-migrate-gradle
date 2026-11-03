@@ -152,4 +152,17 @@ class UsePluginsBlockTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotChangeScriptPlugin() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              """,
+            // Gradle rejects a plugins block in a script plugin applied with `apply from:`
+            spec -> spec.path("gradle/java-conventions.gradle")
+          )
+        );
+    }
 }
