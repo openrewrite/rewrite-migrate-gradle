@@ -31,6 +31,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
   - org.openrewrite.gradle.migrate.java.UseJavaExtensionBlock
+  # BasePluginConvention was removed in Gradle 9; archivesBaseName, libsDirName and distsDirName no longer work
+  - org.openrewrite.gradle.migrate.base.UseBaseExtensionBlock
   - org.openrewrite.gradle.migrate.artifacts.RewriteSpreadAllInConfigurationsBlock
   # version = { } is invalid Gradle DSL; the closure form version { } must be used
   - org.openrewrite.gradle.migrate.artifacts.UseVersionClosure
