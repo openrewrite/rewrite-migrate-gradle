@@ -94,6 +94,64 @@ class AddRootProjectNameTest implements RewriteTest {
     }
 
     @Test
+    void insertsAfterPluginManagementAndPlugins() {
+        rewriteRun(
+          buildGradle("plugins { id 'java' }", named("my-service")),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              plugins {
+                  id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+              }
+
+              include 'api'
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              plugins {
+                  id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+              }
+
+              rootProject.name = 'my-service'
+
+              include 'api'
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertsAfterPluginsBlockWithoutPluginManagement() {
+        rewriteRun(
+          buildGradle("plugins { id 'java' }", named("my-service")),
+          settingsGradle(
+            """
+              plugins {
+                  id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+              }
+
+              rootProject.name = 'my-service'
+              """
+          )
+        );
+    }
+
+    @Test
     void noChangeWhenAlreadyNamed() {
         rewriteRun(
           buildGradle("plugins { id 'java' }", named("my-service")),

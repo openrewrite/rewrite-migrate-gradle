@@ -190,7 +190,10 @@ public class AddRootProjectName extends ScanningRecipe<AddRootProjectName.Accumu
             Statement existing = statements.get(i);
             if (existing instanceof J.MethodInvocation) {
                 String methodName = ((J.MethodInvocation) existing).getSimpleName();
-                if ("pluginManagement".equals(methodName) || "buildscript".equals(methodName)) {
+                // Gradle requires the settings preamble - pluginManagement, buildscript, plugins - to precede
+                // every other statement, so the name goes after the last of them rather than at the top.
+                if ("pluginManagement".equals(methodName) || "buildscript".equals(methodName) ||
+                        "plugins".equals(methodName)) {
                     insertAtIdx = i + 1;
                 }
             }
