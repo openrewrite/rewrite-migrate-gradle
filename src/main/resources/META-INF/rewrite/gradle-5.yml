@@ -23,3 +23,5 @@ recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 5.x
       addIfMissing: false
+  # Gradle 5.0 made replacing a built-in task an error: Cannot add task 'wrapper' as a task with that name already exists
+  - org.openrewrite.gradle.migrate.tasks.ReplaceBuiltInWrapperTask
