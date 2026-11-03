@@ -16,6 +16,8 @@
 package org.openrewrite.gradle.migrate.artifacts;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -627,6 +629,51 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: '$notAnInterpolation'
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"configuration: 'default'", "transitive: false", "changing: true"})
+    void declinesAKeyTheStringCannotHold(String key) {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', %s
+              }
+              """.formatted(key)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"configuration = \"default\"", "isTransitive = false"})
+    void declinesAKeyTheStringCannotHoldInKotlin(String key) {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group = "org.openrewrite", name = "rewrite-core", version = "latest.release", %s)
+              }
+              """.formatted(key),
+            spec -> spec.markers(gradleProject())
           )
         );
     }

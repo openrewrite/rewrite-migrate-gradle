@@ -36,14 +36,18 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 public class DependencyUseStringNotation extends Recipe {
+    private static final Set<String> SPELLABLE_KEYS = new HashSet<>(Arrays.asList("group", "name", "version", "classifier", "ext"));
+
     @Getter
     final String displayName = "Use `String` notation for Gradle dependency declarations";
 
@@ -172,6 +176,10 @@ public class DependencyUseStringNotation extends Recipe {
             private J.@Nullable Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
                 // Name is the only required key in a dependency map.
                 if (mapNotation.containsKey("name")) {
+                    // Any other key, such as `configuration` or `transitive`, has no place in the string and would be lost
+                    if (!SPELLABLE_KEYS.containsAll(mapNotation.keySet())) {
+                        return null;
+                    }
                     for (Expression component : mapNotation.values()) {
                         if (!isSpellableVerbatim(component)) {
                             return null;
