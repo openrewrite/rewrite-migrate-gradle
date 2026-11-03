@@ -22,6 +22,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyTemplate;
@@ -29,10 +30,13 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -61,16 +65,17 @@ public class UseCompileOptionsProperties extends Recipe {
             @Override
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                 G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
-                return c.withStatements(ListUtils.flatMap(c.getStatements(), this::expand));
+                return c.getPadding().withStatements(ListUtils.flatMap(c.getPadding().getStatements(), this::expand));
             }
 
             @Override
             public J visitBlock(J.Block block, ExecutionContext ctx) {
                 J.Block b = (J.Block) super.visitBlock(block, ctx);
-                return b.withStatements(ListUtils.flatMap(b.getStatements(), this::expand));
+                return b.getPadding().withStatements(ListUtils.flatMap(b.getPadding().getStatements(), this::expand));
             }
 
-            private List<Statement> expand(Statement statement) {
+            private List<JRightPadded<Statement>> expand(JRightPadded<Statement> padded) {
+                Statement statement = padded.getElement();
                 Cursor cursor = new Cursor(getCursor(), statement);
                 Statement unwrapped = statement;
                 if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation) {
@@ -79,13 +84,13 @@ public class UseCompileOptionsProperties extends Recipe {
                     cursor = new Cursor(cursor, unwrapped);
                 }
                 if (!(unwrapped instanceof J.MethodInvocation)) {
-                    return singletonList(statement);
+                    return singletonList(padded);
                 }
                 J.MethodInvocation m = (J.MethodInvocation) unwrapped;
                 String options = optionsReceiver(m, cursor);
                 List<G.MapEntry> entries = options == null ? null : namedArguments(m);
                 if (entries == null) {
-                    return singletonList(statement);
+                    return singletonList(padded);
                 }
 
                 String method = m.getSimpleName();
@@ -103,18 +108,39 @@ public class UseCompileOptionsProperties extends Recipe {
                             .apply(cursor, m.getCoordinates().replace(), entry.getValue().withPrefix(Space.EMPTY)));
                 }
                 Space prefix = statement.getPrefix();
-                return ListUtils.map(replacement, (i, s) -> s.withPrefix(i == 0 ? prefix : Space.format(lastLine(prefix))));
+                // A statement that shares its line with the enclosing block, as in `compileJava { options.fork(..) }`,
+                // has no indentation to repeat, so the statements it becomes stay on that line, separated by semicolons.
+                boolean ownLine = prefix.getWhitespace().contains("\n");
+                Space continuation = ownLine ? Space.format(lastLine(prefix)) : Space.SINGLE_SPACE;
+                List<JRightPadded<Statement>> expanded = new ArrayList<>(replacement.size());
+                for (int i = 0; i < replacement.size(); i++) {
+                    Statement spaced = replacement.get(i).withPrefix(i == 0 ? prefix : continuation);
+                    if (i == replacement.size() - 1) {
+                        // The last one inherits where the original statement ended, its own semicolon included
+                        expanded.add(padded.withElement(spaced));
+                    } else {
+                        expanded.add(ownLine ? JRightPadded.build(spaced) : semicolonAfter(spaced));
+                    }
+                }
+                return expanded;
+            }
+
+            /**
+             * The semicolon belongs to the statement's right padding, which is where the Groovy parser puts it.
+             */
+            private JRightPadded<Statement> semicolonAfter(Statement statement) {
+                return JRightPadded.<Statement>build(statement)
+                        .withMarkers(Markers.EMPTY.add(new Semicolon(Tree.randomId())));
             }
 
             private String lastLine(Space prefix) {
                 String whitespace = prefix.getWhitespace();
-                int newline = whitespace.lastIndexOf('\n');
-                return newline < 0 ? "\n" + whitespace : whitespace.substring(newline);
+                return whitespace.substring(whitespace.lastIndexOf('\n'));
             }
 
-            private List<Statement> singletonList(Statement statement) {
-                List<Statement> statements = new ArrayList<>(1);
-                statements.add(statement);
+            private List<JRightPadded<Statement>> singletonList(JRightPadded<Statement> padded) {
+                List<JRightPadded<Statement>> statements = new ArrayList<>(1);
+                statements.add(padded);
                 return statements;
             }
         });

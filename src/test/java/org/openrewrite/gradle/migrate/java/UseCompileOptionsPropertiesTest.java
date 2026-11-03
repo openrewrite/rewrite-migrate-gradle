@@ -122,6 +122,20 @@ class UseCompileOptionsPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void singleLineBlockStaysOnOneLine() {
+        rewriteRun(
+          buildGradle(
+            """
+              compileJava { options.fork(memoryMaximumSize: '256m') }
+              """,
+            """
+              compileJava { options.fork = true; options.forkOptions.memoryMaximumSize = '256m' }
+              """
+          )
+        );
+    }
+
+    @Test
     void namedTaskAndMapLiteral() {
         rewriteRun(
           buildGradle(
