@@ -25,7 +25,7 @@ recipeList:
       version: 9.x
       addIfMissing: false
   # Map notation has been deprecated in 9.1+
-  - org.openrewrite.gradle.DependencyUseStringNotation
+  - org.openrewrite.gradle.migrate.artifacts.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
   - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
   - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
