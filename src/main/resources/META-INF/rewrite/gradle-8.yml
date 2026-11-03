@@ -26,6 +26,8 @@ recipeList:
       addIfMissing: false
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup
   - org.openrewrite.gradle.migrate.jacoco.JacocoReportDeprecations
+  # Already a compile error in Kotlin on 8.x, deprecated in Groovy since 8.2 and removed in 9.0
+  - org.openrewrite.gradle.migrate.application.UseApplicationBlockForDefaultJvmArgs
   # https://docs.gradle.org/8.11.1/userguide/upgrading_version_8.html#test_framework_implementation_dependencies
   - org.openrewrite.gradle.AddJUnitPlatformLauncher
   # https://github.com/gradle/gradle/blob/v7.6.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
