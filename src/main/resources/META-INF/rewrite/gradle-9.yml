@@ -46,6 +46,8 @@ recipeList:
   - org.openrewrite.gradle.plugins.UpgradePluginVersion:
       pluginIdPattern: io.spring.dependency-management
       newVersion: 1.1.7
+  # Using a Project object as a dependency notation is deprecated in 9.6 and fails in 10
+  - org.openrewrite.gradle.migrate.artifacts.UseProjectPathForDependencyNotation
   # PMD's targetJdk is deprecated in 9.6 and has no replacement
   - org.openrewrite.gradle.migrate.quality.RemovePmdTargetJdk
   # CreateStartScripts.exitEnvironmentVar became a no-op and is deprecated in 9.6
