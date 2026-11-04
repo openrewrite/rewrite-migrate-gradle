@@ -131,10 +131,9 @@ class RemoveNonReproducibleArchiveSettingsTest implements RewriteTest {
                   preserveFileTimestamps = true
               }
               """,
-            // Removing the registration would remove the task, not just its settings
+            // The registration stays - removing it would remove the task - but its closure is optional
             """
-              tasks.register('bundle', Zip) {
-              }
+              tasks.register('bundle', Zip)
               """
           )
         );

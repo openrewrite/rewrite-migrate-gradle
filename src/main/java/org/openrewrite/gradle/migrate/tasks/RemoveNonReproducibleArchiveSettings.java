@@ -67,10 +67,18 @@ public class RemoveNonReproducibleArchiveSettings extends Recipe {
             @Override
             public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                // Emptied of its settings, the call configures nothing; all it would still do is realise the
-                // task eagerly, which Gradle discourages. A call that creates a task stays: removing it would
-                // remove the task.
-                return configuresNothing(m) && !configuresNothing(method) ? null : m;
+                if (!hasEmptyClosure(m) || hasEmptyClosure(method)) {
+                    return m;
+                }
+                // A call that creates a task stays, since removing it would remove the task, but the closure
+                // left behind configures nothing and Gradle does not require one.
+                if (TASK_CREATING_METHODS.contains(m.getSimpleName())) {
+                    return m.withArguments(ListUtils.filter(m.getArguments(),
+                            argument -> !isEmptyClosure(argument)));
+                }
+                // Anything else emptied of its settings configures nothing; all it would still do is realise
+                // the task eagerly, which Gradle discourages.
+                return null;
             }
 
             @Override
@@ -84,17 +92,18 @@ public class RemoveNonReproducibleArchiveSettings extends Recipe {
 
     private static final Set<String> TASK_CREATING_METHODS = new HashSet<>(asList("create", "maybeCreate", "register", "task"));
 
-    private static boolean configuresNothing(J.MethodInvocation method) {
-        if (TASK_CREATING_METHODS.contains(method.getSimpleName())) {
-            return false;
-        }
+    private static boolean hasEmptyClosure(J.MethodInvocation method) {
         for (Expression argument : method.getArguments()) {
-            if (argument instanceof J.Lambda && ((J.Lambda) argument).getBody() instanceof J.Block &&
-                    ((J.Block) ((J.Lambda) argument).getBody()).getStatements().isEmpty()) {
+            if (isEmptyClosure(argument)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean isEmptyClosure(Expression argument) {
+        return argument instanceof J.Lambda && ((J.Lambda) argument).getBody() instanceof J.Block &&
+                ((J.Block) ((J.Lambda) argument).getBody()).getStatements().isEmpty();
     }
 
     private static boolean defeatsReproducibility(Statement statement) {
