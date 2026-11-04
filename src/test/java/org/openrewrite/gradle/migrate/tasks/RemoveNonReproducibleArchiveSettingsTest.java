@@ -61,10 +61,8 @@ class RemoveNonReproducibleArchiveSettingsTest implements RewriteTest {
                   isReproducibleFileOrder = false
               }
               """,
-            """
-              tasks.jar {
-              }
-              """
+            // Emptied, it would only realise the task eagerly
+            ""
           )
         );
     }
@@ -95,6 +93,29 @@ class RemoveNonReproducibleArchiveSettingsTest implements RewriteTest {
               tasks.withType(Jar) {
                   archiveBaseName = 'app'
                   duplicatesStrategy = 'exclude'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removesConfigurationBlockLeftEmpty() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              tasks.withType(AbstractArchiveTask).configureEach {
+                  preserveFileTimestamps = true
+                  reproducibleFileOrder = false
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
               }
               """
           )

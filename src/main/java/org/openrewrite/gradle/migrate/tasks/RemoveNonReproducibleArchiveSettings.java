@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.migrate.tasks;
 
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
@@ -25,11 +26,12 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
 
 public class RemoveNonReproducibleArchiveSettings extends Recipe {
@@ -54,14 +56,45 @@ public class RemoveNonReproducibleArchiveSettings extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @Override
-            public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-                J.Block b = super.visitBlock(block, ctx);
+            public J visitBlock(J.Block block, ExecutionContext ctx) {
+                J.Block b = (J.Block) super.visitBlock(block, ctx);
                 return b.withStatements(ListUtils.filter(b.getStatements(),
                         statement -> !defeatsReproducibility(statement)));
             }
+
+            @Override
+            public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                // Emptied of its settings, the call configures nothing; all it would still do is realise the
+                // task eagerly, which Gradle discourages. A call that creates a task stays: removing it would
+                // remove the task.
+                return configuresNothing(m) && !configuresNothing(method) ? null : m;
+            }
+
+            @Override
+            public @Nullable J visitReturn(J.Return return_, ExecutionContext ctx) {
+                J.Return r = (J.Return) super.visitReturn(return_, ctx);
+                // Groovy wraps a closure's or script's final expression in an implicit return
+                return r.getExpression() == null && return_.getExpression() != null ? null : r;
+            }
         });
+    }
+
+    private static final Set<String> TASK_CREATING_METHODS = new HashSet<>(asList("create", "maybeCreate", "register", "task"));
+
+    private static boolean configuresNothing(J.MethodInvocation method) {
+        if (TASK_CREATING_METHODS.contains(method.getSimpleName())) {
+            return false;
+        }
+        for (Expression argument : method.getArguments()) {
+            if (argument instanceof J.Lambda && ((J.Lambda) argument).getBody() instanceof J.Block &&
+                    ((J.Block) ((J.Lambda) argument).getBody()).getStatements().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean defeatsReproducibility(Statement statement) {
