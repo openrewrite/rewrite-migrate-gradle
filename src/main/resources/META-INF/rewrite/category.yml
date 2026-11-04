@@ -47,3 +47,7 @@ packageName: org.openrewrite.gradle.migrate.quality
 type: specs.openrewrite.org/v1beta/category
 name: 'Tasks'
 packageName: org.openrewrite.gradle.migrate.tasks
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'Script plugins'
+packageName: org.openrewrite.gradle.migrate.scripts
