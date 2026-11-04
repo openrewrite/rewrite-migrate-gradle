@@ -49,7 +49,6 @@ public class RemoveExplicitKotlinStdlibDependency extends ScanningRecipe<Set<Str
     private static final String KOTLIN_GROUP = "org.jetbrains.kotlin";
     private static final String DEFAULT_DEPENDENCY_PROPERTY = "kotlin.stdlib.default.dependency";
 
-    /** The first Kotlin Gradle plugin that adds the standard library itself. */
     private static final String FIRST_PLUGIN_ADDING_STDLIB = "1.4.0";
 
     private static final Set<String> STDLIB_ARTIFACTS = new HashSet<>(asList(

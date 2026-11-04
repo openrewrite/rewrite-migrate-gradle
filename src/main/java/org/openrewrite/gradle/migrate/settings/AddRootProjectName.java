@@ -127,7 +127,7 @@ public class AddRootProjectName extends ScanningRecipe<AddRootProjectName.Accumu
                 String quote = cu instanceof K.CompilationUnit ? "\"" : "'";
                 Statement assignment = parseStatement(cu.getSourcePath(),
                         "rootProject.name = " + quote + name + quote, ctx);
-                return assignment == null ? cu : insertAfterPluginManagement(cu, assignment);
+                return assignment == null ? cu : insertAfterPreamble(cu, assignment);
             }
         });
     }
@@ -165,10 +165,9 @@ public class AddRootProjectName extends ScanningRecipe<AddRootProjectName.Accumu
     }
 
     /**
-     * After any `pluginManagement` or `buildscript` block, which Gradle requires to come first, and otherwise at the
-     * top of the script.
+     * After the settings preamble Gradle requires to come first, and otherwise at the top of the script.
      */
-    private static JavaSourceFile insertAfterPluginManagement(JavaSourceFile cu, Statement statement) {
+    private static JavaSourceFile insertAfterPreamble(JavaSourceFile cu, Statement statement) {
         if (cu instanceof G.CompilationUnit) {
             G.CompilationUnit g = (G.CompilationUnit) cu;
             return g.withStatements(insert(g.getStatements(), statement));
