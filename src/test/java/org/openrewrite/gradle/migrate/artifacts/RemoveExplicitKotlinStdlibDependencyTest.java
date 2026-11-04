@@ -17,19 +17,25 @@ package org.openrewrite.gradle.migrate.artifacts;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 
 class RemoveExplicitKotlinStdlibDependencyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withToolingApi())
-                .recipeFromResources("org.openrewrite.gradle.migrate.artifacts.RemoveExplicitKotlinStdlibDependency");
+        // A hand-built marker rather than withToolingApi(): the plugin version is read from the plugins
+        // block, and Gradle 9 cannot configure a project applying a Kotlin plugin old enough to test the 1.4 guard.
+        spec.recipe(new RemoveExplicitKotlinStdlibDependency())
+                .allSources(source -> source.markers(GradleProject.builder()
+                        .name("project")
+                        .path(":")
+                        .build()));
     }
 
     @DocumentExample("Remove the redundant Kotlin standard library declaration")
@@ -256,6 +262,78 @@ class RemoveExplicitKotlinStdlibDependencyTest implements RewriteTest {
 
               dependencies {
                   implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.0.21'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsStdlibWhenDefaultDependencyIsDisabled() {
+        rewriteRun(
+          // Without the plugin's default dependency this declaration is the only thing providing the stdlib
+          properties(
+            """
+              kotlin.stdlib.default.dependency=false
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '2.0.21'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.0.21'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsStdlibVersionNewerThanThePlugin() {
+        rewriteRun(
+          // Removing it would quietly downgrade the standard library to the plugin's version
+          buildGradle(
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '2.0.21'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.1.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsStdlibWhenPluginPredatesTheDefaultDependency() {
+        rewriteRun(
+          // The Kotlin plugin only began adding the standard library itself in 1.4
+          buildGradle(
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.3.72'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.3.72'
               }
               """
           )
