@@ -165,4 +165,32 @@ class UsePluginsBlockTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void afterBuildscriptBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+
+              apply plugin: 'java'
+              """,
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+
+              plugins {
+                  id 'java'
+              }
+              """
+          )
+        );
+    }
 }

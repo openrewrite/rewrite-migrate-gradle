@@ -45,7 +45,9 @@ public class RemoveNonReproducibleArchiveSettings extends Recipe {
             "written into an archive, and file order that follows the filesystem, both make the same sources produce " +
             "a different artifact on each build, which means a published artifact cannot be checked against a " +
             "rebuild of its sources. The reproducible values written explicitly are left alone, since someone who " +
-            "wrote them agrees with the default and said so deliberately. See the " +
+            "wrote them agrees with the default and said so deliberately. Gradle's own defaults only became the " +
+            "reproducible ones in Gradle 9; on earlier versions removing these settings leaves the archive as it " +
+            "was. See the " +
             "[Gradle best practice](https://docs.gradle.org/current/userguide/best_practices_security.html#builds_should_be_reproducible).";
 
     @Getter
