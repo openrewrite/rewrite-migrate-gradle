@@ -37,6 +37,12 @@ recipeList:
 #    "add it, then run the build and fix what it surfaces"; a recipe can only do the first half
 #  - org.openrewrite.gradle.migrate.tasks.UseDefaultPathSensitivity  # changes task cache keys; a task that writes its
 #    input's path into its output would start taking wrong cache hits, silently
+#  - org.openrewrite.gradle.UpdateGradleWrapper:  # prefer_bin_distribution; run alongside the wrapper update the
+#      distribution: bin                          # Gradle 9 migration already does, the two never settle in one
+#                                                 # cycle: whichever runs second finds the BuildTool marker already
+#                                                 # bumped and bails, and with no marker the last one simply wins
+#  - org.openrewrite.gradle.MigrateDependenciesToVersionCatalog  # use_version_catalogs; it generates camelCase keys
+#    (libs.springCore), which contradicts name_version_catalog_entries (spring-core, reached as libs.spring.core)
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.migrate.properties.UseUtf8FileEncoding
