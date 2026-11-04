@@ -76,6 +76,12 @@ public class UsePluginsBlock extends Recipe {
                 // license header onto the block it inserts, sees the file as it was written.
                 JavaSourceFile result = cu;
                 for (String pluginId : pluginIds) {
+                    // AddBuildPlugin decides what is already declared through FindPlugins, which only matches
+                    // `id("...")`. A Kotlin DSL block declaring a core plugin by accessor would otherwise gain a
+                    // second request for the same plugin.
+                    if (declaresPlugin(result, pluginId)) {
+                        continue;
+                    }
                     result = (JavaSourceFile) new AddBuildPlugin(pluginId, null, null, null, null)
                             .getVisitor().visitNonNull(result, ctx);
                 }
@@ -180,6 +186,17 @@ public class UsePluginsBlock extends Recipe {
                     found.set(true);
                 }
                 return super.visitMethodInvocation(method, found);
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
+                // The Kotlin DSL declares a core plugin as a bare accessor rather than a call: plugins { java }
+                J.MethodInvocation enclosing = getCursor().firstEnclosing(J.MethodInvocation.class);
+                if (enclosing != null && "plugins".equals(enclosing.getSimpleName()) &&
+                    pluginId.equals(identifier.getSimpleName())) {
+                    found.set(true);
+                }
+                return super.visitIdentifier(identifier, found);
             }
         }.reduce(cu, new AtomicBoolean()).get();
     }

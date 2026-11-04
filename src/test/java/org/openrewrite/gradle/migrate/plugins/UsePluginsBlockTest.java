@@ -193,4 +193,44 @@ class UsePluginsBlockTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dropApplyOfPluginAlreadyInPluginsBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              apply plugin: 'java'
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslPluginAlreadyDeclaredWithAccessor() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              apply(plugin = "java")
+              """,
+            """
+              plugins {
+                  java
+              }
+              """
+          )
+        );
+    }
 }
