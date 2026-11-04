@@ -65,10 +65,13 @@ public class RemoveNonReproducibleArchiveSettings extends Recipe {
     }
 
     private static boolean defeatsReproducibility(Statement statement) {
-        if (!(statement instanceof J.Assignment)) {
+        // Groovy parses a closure's final statement as an implicit return of its expression, so the last setting
+        // in a block arrives wrapped rather than as a bare assignment.
+        Object candidate = statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement;
+        if (!(candidate instanceof J.Assignment)) {
             return false;
         }
-        J.Assignment assignment = (J.Assignment) statement;
+        J.Assignment assignment = (J.Assignment) candidate;
 
         String name = variableName(assignment.getVariable());
         if (name == null) {

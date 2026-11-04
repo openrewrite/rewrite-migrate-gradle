@@ -100,4 +100,34 @@ class RemoveNonReproducibleArchiveSettingsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepsTaskRegistrationLeftEmpty() {
+        rewriteRun(
+          buildGradle(
+            """
+              tasks.register('bundle', Zip) {
+                  preserveFileTimestamps = true
+              }
+              """,
+            // Removing the registration would remove the task, not just its settings
+            """
+              tasks.register('bundle', Zip) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRemoveBlockThatWasAlreadyEmpty() {
+        rewriteRun(
+          buildGradle(
+            """
+              tasks.withType(AbstractArchiveTask).configureEach {
+              }
+              """
+          )
+        );
+    }
 }
