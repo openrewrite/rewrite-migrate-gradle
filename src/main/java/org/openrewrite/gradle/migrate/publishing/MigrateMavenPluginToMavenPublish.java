@@ -28,11 +28,13 @@ import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.plugins.ChangePlugin;
 import org.openrewrite.gradle.plugins.RemoveBuildPlugin;
+import org.openrewrite.gradle.style.Autodetect;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.SemanticallyEqual;
+import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
@@ -40,6 +42,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.Style;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -184,7 +187,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 if (artifacts == null) {
                     return cu;
                 }
-                String snippet = deployment.render(statementPrefix(cu, upload), artifacts, getCursor());
+                String snippet = deployment.render(artifacts, getCursor());
                 if (snippet == null) {
                     return cu;
                 }
@@ -193,11 +196,12 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     return cu;
                 }
 
-                G.CompilationUnit g = (G.CompilationUnit) new ReplaceStatement(upload, publishing).visitNonNull(cu, ctx);
+                G.CompilationUnit g = (G.CompilationUnit) new ReplaceStatement(upload, publishing)
+                        .visitNonNull(withDetectedStyle(cu), ctx);
                 doAfterVisit(appliesPlugin(cu, MAVEN_PUBLISH) ?
                         new RemoveBuildPlugin(MAVEN).getVisitor() :
                         new ChangePlugin(MAVEN, MAVEN_PUBLISH, null).getVisitor());
-                return (G.CompilationUnit) new SignPublications().visitNonNull(g, ctx);
+                return ((G.CompilationUnit) new SignPublications().visitNonNull(g, ctx)).withMarkers(cu.getMarkers());
             }
         });
     }
@@ -448,22 +452,15 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
     }
 
     /**
-     * The prefix of the statement holding the invocation, which is an implicit `return` when the invocation is
-     * the last statement of a closure.
+     * Without a style, formatting the `publishing { }` block would indent by four spaces whatever the script uses.
      */
-    private static Space statementPrefix(G.CompilationUnit cu, J.MethodInvocation m) {
-        List<Space> prefix = new ArrayList<>(singletonList(m.getPrefix()));
-        new JavaIsoVisitor<List<Space>>() {
-            @Override
-            public J.Return visitReturn(J.Return r, List<Space> p) {
-                if (r.getExpression() instanceof J.MethodInvocation &&
-                    ((J.MethodInvocation) r.getExpression()).getId().equals(m.getId())) {
-                    p.set(0, r.getPrefix());
-                }
-                return super.visitReturn(r, p);
-            }
-        }.visit(cu, prefix);
-        return prefix.get(0);
+    private static G.CompilationUnit withDetectedStyle(G.CompilationUnit cu) {
+        if (Style.from(TabsAndIndentsStyle.class, cu) != null) {
+            return cu;
+        }
+        Autodetect.Detector detector = Autodetect.detector();
+        detector.sample(cu);
+        return cu.withMarkers(cu.getMarkers().add(detector.build()));
     }
 
     private static @Nullable Statement parse(String snippet, ExecutionContext ctx) {
@@ -517,12 +514,6 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
 
     private static boolean isString(Expression e, String value) {
         return e instanceof J.Literal && value.equals(((J.Literal) e).getValue());
-    }
-
-    private static String indentOf(Space prefix) {
-        String ws = prefix.getLastWhitespace();
-        int nl = ws.lastIndexOf('\n');
-        return nl < 0 ? ws : ws.substring(nl + 1);
     }
 
     /**
@@ -598,8 +589,6 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
 
         J.@Nullable MethodInvocation repositories;
 
-        Space repositoriesPrefix = Space.EMPTY;
-
         static @Nullable Deployment of(J.MethodInvocation upload) {
             if (upload.getArguments().size() != 1) {
                 return null;
@@ -611,7 +600,6 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 deployment.repositories.getArguments().size() != 1) {
                 return null;
             }
-            deployment.repositoriesPrefix = uploadBody.getStatements().get(0).getPrefix();
             J.MethodInvocation deployer = onlyInvocation(closureBody(deployment.repositories), "mavenDeployer");
             J.Block body = deployer == null || deployer.getArguments().size() != 1 ? null : closureBody(deployer);
             if (body == null) {
@@ -758,24 +746,12 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
             return topLevel ? POM_PROPERTIES.contains(name) : !POM_COLLECTION_PROPERTIES.contains(name);
         }
 
-        /**
-         * The `publishing { }` block, indented as the `uploadArchives` block it replaces, so that the content
-         * of `pom.project { }` keeps its indentation: both sit four blocks deep.
-         */
         @Nullable
-        String render(Space uploadPrefix, List<String> artifacts, Cursor cursor) {
+        String render(List<String> artifacts, Cursor cursor) {
             Repository rel = release;
             if (rel == null || repositories == null) {
                 return null;
             }
-            String base = indentOf(uploadPrefix);
-            String nested = indentOf(repositoriesPrefix);
-            String unit = nested.startsWith(base) && nested.length() > base.length() ?
-                    nested.substring(base.length()) : "    ";
-            String i1 = base + unit;
-            String i2 = i1 + unit;
-            String i3 = i2 + unit;
-            String i4 = i3 + unit;
 
             String url = choose(rel.getUrl(), snapshot == null ? null : snapshot.getUrl(), cursor);
             String userName;
@@ -793,33 +769,33 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
             }
 
             StringBuilder s = new StringBuilder("publishing {\n");
-            s.append(i1).append("publications {\n");
-            s.append(i2).append("mavenJava(MavenPublication) {\n");
-            s.append(i3).append("from components.java\n");
+            s.append("publications {\n");
+            s.append("mavenJava(MavenPublication) {\n");
+            s.append("from components.java\n");
             for (String artifact : artifacts) {
-                s.append(i3).append("artifact ").append(artifact).append('\n');
+                s.append("artifact ").append(artifact).append('\n');
             }
             if (pom != null && !pom.getStatements().isEmpty()) {
-                s.append(i3).append("pom {");
+                s.append("pom {");
                 for (Statement statement : pom.getStatements()) {
                     s.append(statement.print(cursor));
                 }
-                s.append('\n').append(i3).append("}\n");
+                s.append("\n}\n");
             }
-            s.append(i2).append("}\n");
-            s.append(i1).append("}\n");
-            s.append(i1).append("repositories {\n");
-            s.append(i2).append("maven {\n");
-            s.append(i3).append("url = ").append(url).append('\n');
+            s.append("}\n");
+            s.append("}\n");
+            s.append("repositories {\n");
+            s.append("maven {\n");
+            s.append("url = ").append(url).append('\n');
             if (userName != null && password != null) {
-                s.append(i3).append("credentials {\n");
-                s.append(i4).append("username = ").append(userName).append('\n');
-                s.append(i4).append("password = ").append(password).append('\n');
-                s.append(i3).append("}\n");
+                s.append("credentials {\n");
+                s.append("username = ").append(userName).append('\n');
+                s.append("password = ").append(password).append('\n');
+                s.append("}\n");
             }
-            s.append(i2).append("}\n");
-            s.append(i1).append("}\n");
-            s.append(base).append('}');
+            s.append("}\n");
+            s.append("}\n");
+            s.append('}');
             return s.toString();
         }
 
@@ -850,29 +826,26 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
      */
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class ReplaceStatement extends JavaIsoVisitor<ExecutionContext> {
+    private static class ReplaceStatement extends GroovyIsoVisitor<ExecutionContext> {
         J.MethodInvocation upload;
         Statement replacement;
 
         @Override
         public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
             J.Block b = super.visitBlock(block, ctx);
-            return b.withStatements(ListUtils.map(b.getStatements(), this::replace));
+            return b.withStatements(ListUtils.map(b.getStatements(), s -> replace(s, ctx, getCursor())));
         }
 
         @Override
-        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-            if (tree instanceof G.CompilationUnit) {
-                G.CompilationUnit cu = (G.CompilationUnit) super.visit(tree, ctx);
-                return cu == null ? null : cu.withStatements(ListUtils.map(cu.getStatements(), this::replace));
-            }
-            return super.visit(tree, ctx);
+        public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+            G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
+            return g.withStatements(ListUtils.map(g.getStatements(), s -> replace(s, ctx, getCursor())));
         }
 
-        private Statement replace(Statement s) {
+        private Statement replace(Statement s, ExecutionContext ctx, Cursor parent) {
             J.MethodInvocation m = asInvocation(s);
             if (m != null && m.getId().equals(upload.getId())) {
-                return replacement.withPrefix(s.getPrefix());
+                return autoFormat(replacement.withPrefix(s.getPrefix()), ctx, parent);
             }
             return s;
         }
