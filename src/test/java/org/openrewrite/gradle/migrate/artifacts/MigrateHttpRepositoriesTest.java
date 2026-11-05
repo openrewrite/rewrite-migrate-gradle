@@ -312,8 +312,91 @@ class MigrateHttpRepositoriesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keepCommentOnUrlLine() {
+        rewriteRun(
+          buildGradle(
+            """
+              repositories {
+                  maven {
+                      url 'http://nexus.example.com/repository/maven-public/' // the company mirror
+                      name 'nexus'
+                  }
+                  maven {
+                      url 'http://nexus.example.com/repository/maven-snapshots/' // snapshots
+                  }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      url 'http://nexus.example.com/repository/maven-public/' // the company mirror
+                      allowInsecureProtocol = true
+                      name 'nexus'
+                  }
+                  maven {
+                      url 'http://nexus.example.com/repository/maven-snapshots/' // snapshots
+                      allowInsecureProtocol = true
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void useHttpsForHostThatRedirectsToHttps() {
+        rewriteRun(
+          buildGradle(
+            """
+              repositories {
+                  maven {
+                      name = "forge"
+                      url = "http://files.minecraftforge.net/maven"
+                  }
+                  maven { url 'http://jcenter.bintray.com/' }
+                  maven { url 'http://repo.jenkins-ci.org/public/' }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      name = "forge"
+                      url = "https://files.minecraftforge.net/maven"
+                  }
+                  maven { url 'https://jcenter.bintray.com/' }
+                  maven { url 'https://repo.jenkins-ci.org/public/' }
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class KotlinDsl {
+
+        @Test
+        void keepCommentOnUrlLine() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  repositories {
+                      maven {
+                          url = uri("http://nexus.example.com/repository/maven-public/") // the company mirror
+                      }
+                  }
+                  """,
+                """
+                  repositories {
+                      maven {
+                          url = uri("http://nexus.example.com/repository/maven-public/") // the company mirror
+                          isAllowInsecureProtocol = true
+                      }
+                  }
+                  """
+              )
+            );
+        }
 
         @Test
         void useHttpsForPublicHostAndAllowInsecureProtocolOtherwise() {

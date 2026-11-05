@@ -35,6 +35,7 @@ import org.openrewrite.kotlin.tree.K;
 import java.util.*;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 public class MigrateHttpRepositories extends Recipe {
@@ -59,7 +60,15 @@ public class MigrateHttpRepositories extends Recipe {
             "maven.aliyun.com",
             "mirrors.cloud.tencent.com",
             "repo.huaweicloud.com",
-            "mirrors.huaweicloud.com"
+            "mirrors.huaweicloud.com",
+            // These redirect `http://` to the same path over HTTPS, which Gradle 7 refuses to follow
+            "jcenter.bintray.com",
+            "repo.jenkins-ci.org",
+            "files.minecraftforge.net",
+            "repo.spongepowered.org",
+            "maven.restlet.org",
+            "raw.github.com",
+            "raw.githubusercontent.com"
     ));
 
     private static final Set<String> REPOSITORY_TYPES = new HashSet<>(asList("maven", "ivy", "jcenter", "mavenCentral"));
@@ -255,18 +264,30 @@ public class MigrateHttpRepositories extends Recipe {
              * single line is spread over several lines first.
              */
             private J.Block addAfter(J.Block body, int index, Statement statement) {
-                List<Statement> statements = new ArrayList<>(body.getStatements());
-                String previous = index < 0 ? "" : statements.get(index).getPrefix().getWhitespace();
+                String previous = index < 0 ? "" : body.getStatements().get(index).getPrefix().getWhitespace();
                 if (previous.contains("\n")) {
-                    statements.add(index + 1, statement.withPrefix(Space.format("\n" + previous.substring(previous.lastIndexOf('\n') + 1))));
-                    return body.withStatements(statements);
+                    String indent = "\n" + previous.substring(previous.lastIndexOf('\n') + 1);
+                    Space prefix = Space.format(indent);
+                    boolean last = index + 1 == body.getStatements().size();
+                    Space following = last ? body.getEnd() : body.getStatements().get(index + 1).getPrefix();
+                    List<Comment> comments = following.getComments();
+                    if (!following.getWhitespace().contains("\n") && !comments.isEmpty() && !comments.get(0).isMultiline()) {
+                        // A comment ending the line before stays on that line
+                        prefix = Space.build(following.getWhitespace(), singletonList(comments.get(0).withSuffix(indent)));
+                        following = Space.build(comments.get(0).getSuffix(), comments.subList(1, comments.size()));
+                    }
+                    Statement inserted = statement.withPrefix(prefix);
+                    Space next = following;
+                    List<Statement> statements = ListUtils.flatMap(body.getStatements(), (i, s) ->
+                            i == index ? asList(s, inserted) : i == index + 1 ? s.withPrefix(next) : s);
+                    return (last ? body.withEnd(following) : body).withStatements(statements);
                 }
                 String outer = indentation(statementPrefix().getWhitespace());
                 String inner = outer + (outer.contains("\t") ? "\t" : "    ");
-                statements = ListUtils.map(statements, s -> s.getPrefix().getWhitespace().contains("\n") ? s :
+                List<Statement> statements = ListUtils.map(body.getStatements(), s -> s.getPrefix().getWhitespace().contains("\n") ? s :
                         s.withPrefix(Space.format("\n" + inner)));
-                statements.add(index + 1, statement.withPrefix(Space.format("\n" + inner)));
-                return body.withStatements(statements).withEnd(Space.format("\n" + outer));
+                return body.withStatements(ListUtils.insert(statements, statement.withPrefix(Space.format("\n" + inner)), index + 1))
+                        .withEnd(Space.format("\n" + outer));
             }
 
             /**
