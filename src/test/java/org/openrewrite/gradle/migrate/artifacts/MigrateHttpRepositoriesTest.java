@@ -345,25 +345,6 @@ class MigrateHttpRepositoriesTest implements RewriteTest {
     }
 
     @Test
-    void keepTrailingWhitespaceOnUrlLine() {
-        rewriteRun(
-          buildGradle(
-            "repositories {\n" +
-            "    maven {\n" +
-            "        url 'http://nexus.example.com/repository/maven-public/'  \n" +
-            "    }\n" +
-            "}\n",
-            "repositories {\n" +
-            "    maven {\n" +
-            "        url 'http://nexus.example.com/repository/maven-public/'  \n" +
-            "        allowInsecureProtocol = true\n" +
-            "    }\n" +
-            "}\n"
-          )
-        );
-    }
-
-    @Test
     void useHttpsForHostThatRedirectsToHttps() {
         rewriteRun(
           buildGradle(

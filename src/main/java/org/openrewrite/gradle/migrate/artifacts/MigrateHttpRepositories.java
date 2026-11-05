@@ -35,6 +35,7 @@ import org.openrewrite.kotlin.tree.K;
 import java.util.*;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 public class MigrateHttpRepositories extends Recipe {
@@ -263,51 +264,30 @@ public class MigrateHttpRepositories extends Recipe {
              * single line is spread over several lines first.
              */
             private J.Block addAfter(J.Block body, int index, Statement statement) {
-                List<Statement> statements = new ArrayList<>(body.getStatements());
-                String previous = index < 0 ? "" : statements.get(index).getPrefix().getWhitespace();
+                String previous = index < 0 ? "" : body.getStatements().get(index).getPrefix().getWhitespace();
                 if (previous.contains("\n")) {
-                    // What ends the line before, trailing whitespace or a comment, stays on that line
-                    boolean last = index + 1 == statements.size();
-                    Space following = last ? body.getEnd() : statements.get(index + 1).getPrefix();
-                    Space[] split = splitAtLineEnd(following);
-                    if (last) {
-                        body = body.withEnd(split[1]);
-                    } else {
-                        statements.set(index + 1, statements.get(index + 1).withPrefix(split[1]));
-                    }
                     String indent = "\n" + previous.substring(previous.lastIndexOf('\n') + 1);
-                    Space prefix = split[0].getComments().isEmpty() ?
-                            Space.format(split[0].getWhitespace() + indent) :
-                            split[0].withComments(ListUtils.mapLast(split[0].getComments(), c -> c.withSuffix(indent)));
-                    statements.add(index + 1, statement.withPrefix(prefix));
-                    return body.withStatements(statements);
+                    Space prefix = Space.format(indent);
+                    boolean last = index + 1 == body.getStatements().size();
+                    Space following = last ? body.getEnd() : body.getStatements().get(index + 1).getPrefix();
+                    List<Comment> comments = following.getComments();
+                    if (!following.getWhitespace().contains("\n") && !comments.isEmpty() && !comments.get(0).isMultiline()) {
+                        // A comment ending the line before stays on that line
+                        prefix = Space.build(following.getWhitespace(), singletonList(comments.get(0).withSuffix(indent)));
+                        following = Space.build(comments.get(0).getSuffix(), comments.subList(1, comments.size()));
+                    }
+                    Statement inserted = statement.withPrefix(prefix);
+                    Space next = following;
+                    List<Statement> statements = ListUtils.flatMap(body.getStatements(), (i, s) ->
+                            i == index ? asList(s, inserted) : i == index + 1 ? s.withPrefix(next) : s);
+                    return (last ? body.withEnd(following) : body).withStatements(statements);
                 }
                 String outer = indentation(statementPrefix().getWhitespace());
                 String inner = outer + (outer.contains("\t") ? "\t" : "    ");
-                statements = ListUtils.map(statements, s -> s.getPrefix().getWhitespace().contains("\n") ? s :
+                List<Statement> statements = ListUtils.map(body.getStatements(), s -> s.getPrefix().getWhitespace().contains("\n") ? s :
                         s.withPrefix(Space.format("\n" + inner)));
-                statements.add(index + 1, statement.withPrefix(Space.format("\n" + inner)));
-                return body.withStatements(statements).withEnd(Space.format("\n" + outer));
-            }
-
-            /**
-             * Splits the space after a statement into what remains on the statement's own line, without the line
-             * break, and what starts at the line break.
-             */
-            private Space[] splitAtLineEnd(Space space) {
-                String ws = space.getWhitespace();
-                if (ws.contains("\n")) {
-                    String trailing = ws.substring(0, ws.indexOf('\n'));
-                    return new Space[]{Space.format(trailing), space.withWhitespace(ws.substring(trailing.length()))};
-                }
-                List<Comment> comments = space.getComments();
-                if (!comments.isEmpty() && !comments.get(0).isMultiline() && comments.get(0).getSuffix().startsWith("\n")) {
-                    Comment first = comments.get(0);
-                    return new Space[]{
-                            Space.build(ws, Collections.singletonList(first.withSuffix(""))),
-                            Space.build(first.getSuffix(), comments.subList(1, comments.size()))};
-                }
-                return new Space[]{Space.EMPTY, space};
+                return body.withStatements(ListUtils.insert(statements, statement.withPrefix(Space.format("\n" + inner)), index + 1))
+                        .withEnd(Space.format("\n" + outer));
             }
 
             /**
