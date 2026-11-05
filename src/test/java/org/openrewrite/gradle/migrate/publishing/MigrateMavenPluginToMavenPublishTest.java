@@ -806,4 +806,416 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
           )
         );
     }
+    @Test
+    void removeUnusedPluginKeepsLicenseHeader() {
+        rewriteRun(
+          buildGradle(
+            """
+              /*
+               * Licensed under the Apache License, Version 2.0
+               */
+
+              apply plugin: 'maven'
+              apply plugin: 'java'
+              """,
+            """
+              /*
+               * Licensed under the Apache License, Version 2.0
+               */
+
+              apply plugin: 'java'
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedPluginKeepsCommentAbove() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              //apply plugin: 'errorprone'
+              apply plugin: 'maven'
+              apply plugin: 'application'
+              """,
+            """
+              apply plugin: 'java'
+              //apply plugin: 'errorprone'
+              apply plugin: 'application'
+              """
+          )
+        );
+    }
+
+    @Test
+    void severalArchivesArtifactsInOneCall() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              artifacts {
+                  archives javadocJar, sourcesJar
+              }
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
+              """,
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven-publish'
+
+              artifacts {
+                  archives javadocJar, sourcesJar
+              }
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                          artifact javadocJar
+                          artifact sourcesJar
+                      }
+                  }
+                  repositories {
+                      maven {
+                          url = "https://repo.example.org/releases"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyPluginProvidesJavaComponent() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.4.0'
+                  id 'maven'
+              }
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: uri('repo'))
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.4.0'
+                  id 'maven-publish'
+              }
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                      }
+                  }
+                  repositories {
+                      maven {
+                          url = uri('repo')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void gradlePluginProjectPublishesPluginMaven() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java-gradle-plugin'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: uri('../repo'))
+                      }
+                  }
+              }
+              """,
+            """
+              apply plugin: 'java-gradle-plugin'
+              apply plugin: 'maven-publish'
+
+              publishing {
+                  repositories {
+                      maven {
+                          url = uri('../repo')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void gradlePluginProjectConfiguresPluginMavenPom() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'groovy'
+              apply plugin: 'java-gradle-plugin'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: uri('../repo'))
+                          pom.project {
+                              name 'example-plugin'
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              apply plugin: 'groovy'
+              apply plugin: 'java-gradle-plugin'
+              apply plugin: 'maven-publish'
+
+              publishing {
+                  publications {
+                      pluginMaven(MavenPublication) {
+                          pom {
+                              name = 'example-plugin'
+                          }
+                      }
+                  }
+                  repositories {
+                      maven {
+                          url = uri('../repo')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepCommentsOfDeployer() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          /*
+                           * the staging repository of Sonatype
+                           */
+                          repository(url: "https://repo.example.org/releases")
+                          //mavenLocal()
+                          // describes the library
+                          pom.project {
+                              name 'example'
+                              // more to come
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven-publish'
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                          //mavenLocal()
+                          // describes the library
+                          pom {
+                              name = 'example'
+                              // more to come
+                          }
+                      }
+                  }
+                  repositories {
+                      /*
+                       * the staging repository of Sonatype
+                       */
+                      maven {
+                          url = "https://repo.example.org/releases"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sameCredentialsForBothRepositories() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases") {
+                              authentication(userName: project.properties["repoUser"], password: project.properties["repoPassword"])
+                          }
+                          snapshotRepository(url: "https://repo.example.org/snapshots") {
+                              authentication(userName: project.properties["repoUser"], password: project.properties["repoPassword"])
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven-publish'
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                      }
+                  }
+                  repositories {
+                      maven {
+                          url = version.toString().endsWith('SNAPSHOT') ? "https://repo.example.org/snapshots" : "https://repo.example.org/releases"
+                          credentials {
+                              username = project.properties["repoUser"]
+                              password = project.properties["repoPassword"]
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeWhenSignArchivesTaskIsConfigured() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+              apply plugin: 'signing'
+
+              signing {
+                  sign configurations.archives
+              }
+
+              signArchives.enabled = gradle.startParameter.taskNames.contains("publish")
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeWhenSigningPrecedesPlugin() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'signing'
+
+              signing {
+                  sign configurations.archives
+              }
+
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void switchPluginAppliedAfterImport() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "com.gradle.plugin-publish" version "0.21.0"
+              }
+
+              apply plugin: 'java-library'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: uri('../repo'))
+                      }
+                  }
+              }
+
+              apply plugin: 'eclipse'
+              import org.gradle.plugins.ide.eclipse.model.*
+              """,
+            """
+              plugins {
+                  id "com.gradle.plugin-publish" version "0.21.0"
+              }
+
+              apply plugin: 'java-library'
+              apply plugin: 'maven-publish'
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                      }
+                  }
+                  repositories {
+                      maven {
+                          url = uri('../repo')
+                      }
+                  }
+              }
+
+              apply plugin: 'eclipse'
+              import org.gradle.plugins.ide.eclipse.model.*
+              """
+          )
+        );
+    }
 }

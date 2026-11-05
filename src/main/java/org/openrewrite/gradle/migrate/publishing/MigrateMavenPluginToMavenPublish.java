@@ -35,6 +35,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
@@ -96,6 +97,19 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
     private static final Set<String> POM_COLLECTION_PROPERTIES = new HashSet<>(Arrays.asList(
             "roles", "otherArchives"));
 
+    /**
+     * Plugins that apply the Java plugin, which provides `components.java`.
+     */
+    private static final Set<String> JAVA_PLUGINS = new HashSet<>(Arrays.asList(
+            "java", "java-library", "application", "groovy", "scala", "java-gradle-plugin", "groovy-gradle-plugin",
+            "kotlin", "org.jetbrains.kotlin.jvm"));
+
+    /**
+     * Plugins that add the `pluginMaven` publication of the jar as soon as `maven-publish` is applied.
+     */
+    private static final Set<String> GRADLE_PLUGIN_PLUGINS = new HashSet<>(Arrays.asList(
+            "java-gradle-plugin", "groovy-gradle-plugin"));
+
     String displayName = "Migrate the removed `maven` plugin to `maven-publish`";
 
     String description = "Gradle 7.0 removed the legacy `maven` plugin together with the `uploadArchives` task, " +
@@ -152,8 +166,8 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     if (usesLegacyPlugin(cu, null)) {
                         return cu;
                     }
-                    doAfterVisit(new RemoveBuildPlugin(MAVEN).getVisitor());
-                    return cu;
+                    G.CompilationUnit removed = removePlugin(cu, ctx);
+                    return removed == null ? cu : removed;
                 }
 
                 if (uploads.size() > 1 || usesLegacyPlugin(cu, uploads.get(0)) ||
@@ -165,7 +179,11 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     return cu;
                 }
                 // Without the Java plugin there is no `components.java` to publish
-                if (!appliesPlugin(cu, "java") && !appliesPlugin(cu, "java-library")) {
+                if (JAVA_PLUGINS.stream().noneMatch(id -> appliesPlugin(cu, id))) {
+                    return cu;
+                }
+                // The `signArchives` task goes away once `signing` signs the publications instead
+                if (refersTo(cu, "signArchives") || signsBeforeApplyingPlugin(cu)) {
                     return cu;
                 }
                 J.MethodInvocation upload = uploads.get(0);
@@ -187,7 +205,9 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 if (artifacts == null) {
                     return cu;
                 }
-                String snippet = deployment.render(artifacts, getCursor());
+                // `java-gradle-plugin` publishes the jar itself, as the `pluginMaven` publication
+                boolean gradlePlugin = GRADLE_PLUGIN_PLUGINS.stream().anyMatch(id -> appliesPlugin(cu, id));
+                String snippet = deployment.render(artifacts, gradlePlugin, getCursor());
                 if (snippet == null) {
                     return cu;
                 }
@@ -198,12 +218,134 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
 
                 G.CompilationUnit g = (G.CompilationUnit) new ReplaceStatement(upload, publishing)
                         .visitNonNull(withDetectedStyle(cu), ctx);
-                doAfterVisit(appliesPlugin(cu, MAVEN_PUBLISH) ?
-                        new RemoveBuildPlugin(MAVEN).getVisitor() :
-                        new ChangePlugin(MAVEN, MAVEN_PUBLISH, null).getVisitor());
-                return ((G.CompilationUnit) new SignPublications().visitNonNull(g, ctx)).withMarkers(cu.getMarkers());
+                g = ((G.CompilationUnit) new SignPublications().visitNonNull(g, ctx)).withMarkers(cu.getMarkers());
+                if (appliesPlugin(cu, MAVEN_PUBLISH)) {
+                    G.CompilationUnit removed = removePlugin(g, ctx);
+                    return removed == null ? cu : removed;
+                }
+                return changePlugin(g, ctx);
             }
         });
+    }
+
+    /**
+     * Removes the `maven` plugin, keeping the comments of the line that applied it, or returns null where it cannot.
+     */
+    private static G.@Nullable CompilationUnit removePlugin(G.CompilationUnit cu, ExecutionContext ctx) {
+        G.CompilationUnit removed = (G.CompilationUnit) new RemoveBuildPlugin(MAVEN).getVisitor()
+                .visitNonNull(new MoveCommentsOffPlugin().visitNonNull(cu, 0), ctx);
+        // `RemoveBuildPlugin` recognizes `apply plugin:` by its type, which some build scripts lack
+        return appliesPlugin(removed, MAVEN) || comments(removed).size() < comments(cu).size() ? null : removed;
+    }
+
+    /**
+     * Switches the `maven` plugin to `maven-publish`, also where `ChangePlugin` does not recognize the application
+     * for want of type attribution.
+     */
+    private static G.CompilationUnit changePlugin(G.CompilationUnit cu, ExecutionContext ctx) {
+        G.CompilationUnit changed = (G.CompilationUnit) new ChangePlugin(MAVEN, MAVEN_PUBLISH, null).getVisitor()
+                .visitNonNull(cu, ctx);
+        if (!appliesPlugin(changed, MAVEN)) {
+            return changed;
+        }
+        return (G.CompilationUnit) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, Integer p) {
+                J.MethodInvocation enclosing = getCursor().firstEnclosing(J.MethodInvocation.class);
+                if (J.Literal.isLiteralValue(literal, MAVEN) && literal.getValueSource() != null && enclosing != null &&
+                    isPluginApplication(enclosing, getCursor().dropParentUntil(enclosing::equals), MAVEN)) {
+                    return literal.withValue(MAVEN_PUBLISH)
+                            .withValueSource(literal.getValueSource().replace(MAVEN, MAVEN_PUBLISH));
+                }
+                return literal;
+            }
+        }.visitNonNull(changed, 0);
+    }
+
+    private static List<String> comments(J tree) {
+        return new GroovyIsoVisitor<List<String>>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, List<String> found) {
+                for (Comment comment : space.getComments()) {
+                    found.add(comment.printComment(getCursor()));
+                }
+                return space;
+            }
+        }.reduce(tree, new ArrayList<>());
+    }
+
+    /**
+     * `RemoveBuildPlugin` drops the line that applies the plugin together with the comments above it, which may be
+     * anything from a commented out plugin to the license header of the file, so they move to the line below.
+     */
+    private static class MoveCommentsOffPlugin extends GroovyIsoVisitor<Integer> {
+        @Override
+        public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, Integer p) {
+            G.CompilationUnit g = super.visitCompilationUnit(cu, p);
+            List<Statement> statements = moveComments(g.getStatements());
+            Space eof = g.getEof();
+            if (statements.size() > 0 && isPluginStatement(statements.get(statements.size() - 1))) {
+                eof = lastCommentsTo(statements, eof);
+            }
+            return g.withStatements(statements).withEof(eof);
+        }
+
+        @Override
+        public J.Block visitBlock(J.Block block, Integer p) {
+            J.Block b = super.visitBlock(block, p);
+            List<Statement> statements = moveComments(b.getStatements());
+            Space end = b.getEnd();
+            if (statements.size() > 0 && isPluginStatement(statements.get(statements.size() - 1))) {
+                end = lastCommentsTo(statements, end);
+            }
+            return b.withStatements(statements).withEnd(end);
+        }
+
+        private List<Statement> moveComments(List<Statement> statements) {
+            List<Statement> moved = new ArrayList<>(statements);
+            for (int i = 0; i < moved.size() - 1; i++) {
+                Statement s = moved.get(i);
+                if (isPluginStatement(s) && !s.getComments().isEmpty()) {
+                    Statement next = moved.get(i + 1);
+                    moved.set(i + 1, next.withPrefix(merge(s.getPrefix(), next.getPrefix())));
+                    moved.set(i, s.withPrefix(Space.format(s.getPrefix().getWhitespace())));
+                }
+            }
+            return moved;
+        }
+
+        private Space lastCommentsTo(List<Statement> statements, Space following) {
+            int last = statements.size() - 1;
+            Statement s = statements.get(last);
+            if (s.getComments().isEmpty()) {
+                return following;
+            }
+            statements.set(last, s.withPrefix(Space.format(s.getPrefix().getWhitespace())));
+            return merge(s.getPrefix(), following);
+        }
+
+        /**
+         * The comments of {@code removed}, then those of {@code following}, keeping the larger of the two gaps
+         * between the last comment of {@code removed} and the code below it.
+         */
+        private static Space merge(Space removed, Space following) {
+            List<Comment> comments = new ArrayList<>(removed.getComments());
+            Comment last = comments.get(comments.size() - 1);
+            String gap = newlines(following.getWhitespace()) > newlines(last.getSuffix()) ?
+                    following.getWhitespace() : last.getSuffix();
+            comments.set(comments.size() - 1, last.withSuffix(gap));
+            comments.addAll(following.getComments());
+            return removed.withComments(comments);
+        }
+
+        private static long newlines(String whitespace) {
+            return whitespace.chars().filter(c -> c == '\n').count();
+        }
+
+        private boolean isPluginStatement(Statement s) {
+            J.MethodInvocation m = asInvocation(s);
+            return m != null && isPluginApplication(m, new Cursor(getCursor(), m), MAVEN);
+        }
     }
 
     private static boolean appliesPlugin(G.CompilationUnit cu, String pluginId) {
@@ -229,8 +371,19 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         }
         if ("id".equals(m.getSimpleName()) && m.getSelect() == null && m.getArguments().size() == 1 &&
             J.Literal.isLiteralValue(m.getArguments().get(0), pluginId)) {
-            J.MethodInvocation enclosing = cursor.getParentTreeCursor().firstEnclosing(J.MethodInvocation.class);
-            return enclosing != null && "plugins".equals(enclosing.getSimpleName());
+            // `id '<id>'`, or `id '<id>' version '<version>'`, in which `id(..)` is the select of `version(..)`
+            Iterator<Object> path = cursor.getPath();
+            while (path.hasNext()) {
+                if (path.next() instanceof J.Lambda) {
+                    while (path.hasNext()) {
+                        Object enclosing = path.next();
+                        if (enclosing instanceof J.MethodInvocation) {
+                            return "plugins".equals(((J.MethodInvocation) enclosing).getSimpleName());
+                        }
+                    }
+                }
+            }
+            return false;
         }
         return false;
     }
@@ -271,6 +424,49 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     }
                 }
                 return literal;
+            }
+        }.reduce(cu, new AtomicBoolean()).get();
+    }
+
+    /**
+     * Whether the script names {@code name}, as an identifier or in a string.
+     */
+    private static boolean refersTo(G.CompilationUnit cu, String name) {
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean f) {
+                if (name.equals(identifier.getSimpleName())) {
+                    f.set(true);
+                }
+                return identifier;
+            }
+
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, AtomicBoolean f) {
+                if (literal.getValue() instanceof String && ((String) literal.getValue()).contains(name)) {
+                    f.set(true);
+                }
+                return literal;
+            }
+        }.reduce(cu, new AtomicBoolean()).get();
+    }
+
+    /**
+     * Whether `signing` signs the `archives` configuration before the `maven` plugin is applied, where
+     * `publishing.publications` would not exist yet.
+     */
+    private static boolean signsBeforeApplyingPlugin(G.CompilationUnit cu) {
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            boolean applied;
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
+                if (isPluginApplication(method, getCursor(), MAVEN)) {
+                    applied = true;
+                } else if (!applied && isSignArchives(method, getCursor())) {
+                    f.set(true);
+                }
+                return super.visitMethodInvocation(method, f);
             }
         }.reduce(cu, new AtomicBoolean()).get();
     }
@@ -435,12 +631,15 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 if (archives == null || !"archives".equals(archives.getSimpleName()) || archives.getSelect() != null) {
                     continue;
                 }
-                if (archives.getArguments().size() != 1 || !(archives.getArguments().get(0) instanceof J.Identifier)) {
-                    return null;
-                }
-                String artifact = ((J.Identifier) archives.getArguments().get(0)).getSimpleName();
-                if (!"jar".equals(artifact) && !artifacts.contains(artifact)) {
-                    artifacts.add(artifact);
+                // `archives sourcesJar`, or `archives javadocJar, sourcesJar`
+                for (Expression arg : archives.getArguments()) {
+                    if (!(arg instanceof J.Identifier)) {
+                        return null;
+                    }
+                    String artifact = ((J.Identifier) arg).getSimpleName();
+                    if (!"jar".equals(artifact) && !artifacts.contains(artifact)) {
+                        artifacts.add(artifact);
+                    }
                 }
             }
         }
@@ -577,6 +776,17 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
 
         J.@Nullable Block pom;
 
+        /**
+         * The `pom.project { }` statement, possibly the implicit return of the `mavenDeployer` closure.
+         */
+        @Nullable
+        Statement pomProject;
+
+        /**
+         * Comments in the `uploadArchives` block outside of `pom.project { }`, which go above the repository.
+         */
+        List<Space> comments = new ArrayList<>();
+
         boolean signPom;
 
         J.@Nullable MethodInvocation repositories;
@@ -602,7 +812,27 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     return null;
                 }
             }
-            return deployment.release == null ? null : deployment;
+            if (deployment.release == null) {
+                return null;
+            }
+            Statement pomProject = deployment.pomProject;
+            new JavaIsoVisitor<List<Space>>() {
+                @Override
+                public @Nullable J visit(@Nullable Tree tree, List<Space> found) {
+                    // `pom.project { }` keeps its own comments
+                    return pomProject != null && tree != null && tree.getId().equals(pomProject.getId()) ?
+                            (J) tree : super.visit(tree, found);
+                }
+
+                @Override
+                public Space visitSpace(Space space, Space.Location loc, List<Space> found) {
+                    if (!space.getComments().isEmpty()) {
+                        found.add(space);
+                    }
+                    return space;
+                }
+            }.visit(upload.withPrefix(Space.EMPTY), deployment.comments);
+            return deployment;
         }
 
         private boolean accept(Statement s) {
@@ -652,6 +882,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     }
                     J.Block body = closureBody(m);
                     pom = body == null ? null : convertPom(body, true);
+                    pomProject = s;
                     return pom != null;
                 default:
                     return false;
@@ -739,7 +970,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         }
 
         @Nullable
-        String render(List<String> artifacts, Cursor cursor) {
+        String render(List<String> artifacts, boolean gradlePlugin, Cursor cursor) {
             Repository rel = release;
             if (rel == null || repositories == null) {
                 return null;
@@ -760,23 +991,35 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 return null;
             }
 
+            boolean hasPom = pom != null && (!pom.getStatements().isEmpty() || !pom.getEnd().getComments().isEmpty());
             StringBuilder s = new StringBuilder("publishing {\n");
-            s.append("publications {\n");
-            s.append("mavenJava(MavenPublication) {\n");
-            s.append("from components.java\n");
-            for (String artifact : artifacts) {
-                s.append("artifact ").append(artifact).append('\n');
-            }
-            if (pom != null && !pom.getStatements().isEmpty()) {
-                s.append("pom {");
-                for (Statement statement : pom.getStatements()) {
-                    s.append(statement.print(cursor));
+            if (!gradlePlugin || !artifacts.isEmpty() || hasPom) {
+                s.append("publications {\n");
+                if (gradlePlugin) {
+                    s.append("pluginMaven(MavenPublication) {\n");
+                } else {
+                    s.append("mavenJava(MavenPublication) {\n");
+                    s.append("from components.java\n");
                 }
-                s.append("\n}\n");
+                for (String artifact : artifacts) {
+                    s.append("artifact ").append(artifact).append('\n');
+                }
+                if (hasPom) {
+                    if (pomProject != null) {
+                        appendComments(s, singletonList(pomProject.getPrefix()), cursor);
+                    }
+                    s.append("pom {");
+                    for (Statement statement : pom.getStatements()) {
+                        s.append(statement.print(cursor));
+                    }
+                    appendComments(s.append('\n'), singletonList(pom.getEnd()), cursor);
+                    s.append("}\n");
+                }
+                s.append("}\n");
+                s.append("}\n");
             }
-            s.append("}\n");
-            s.append("}\n");
             s.append("repositories {\n");
+            appendComments(s, comments, cursor);
             s.append("maven {\n");
             s.append("url = ").append(url).append('\n');
             if (userName != null && password != null) {
@@ -792,12 +1035,29 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         }
 
         /**
+         * Appends each comment on a line of its own, its continuation lines without the indentation of the line the
+         * comment began on, which `autoFormat` replaces by the indentation of the new line.
+         */
+        private static void appendComments(StringBuilder s, List<Space> spaces, Cursor cursor) {
+            for (Space space : spaces) {
+                String before = space.getWhitespace();
+                for (Comment comment : space.getComments()) {
+                    String indent = before.substring(before.lastIndexOf('\n') + 1);
+                    String text = comment.printComment(cursor);
+                    s.append(indent.isEmpty() ? text : text.replace("\n" + indent, "\n")).append('\n');
+                    before = comment.getSuffix();
+                }
+            }
+        }
+
+        /**
          * `mavenDeployer` deploys a `-SNAPSHOT` version to the snapshot repository when it has one, unless the
          * build itself chose between the repositories with an `if`.
          */
         private String choose(Expression forRelease, @Nullable Expression forSnapshot, Cursor cursor) {
             String rel = forRelease.printTrimmed(cursor);
-            if (forSnapshot == null || SemanticallyEqual.areEqual(forRelease, forSnapshot)) {
+            if (forSnapshot == null || SemanticallyEqual.areEqual(forRelease, forSnapshot) ||
+                rel.equals(forSnapshot.printTrimmed(cursor))) {
                 return rel;
             }
             String snap = forSnapshot.printTrimmed(cursor);
@@ -837,9 +1097,57 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         private Statement replace(Statement s, ExecutionContext ctx, Cursor parent) {
             J.MethodInvocation m = asInvocation(s);
             if (m != null && m.getId().equals(upload.getId())) {
-                return autoFormat(replacement.withPrefix(s.getPrefix()), ctx, parent);
+                Statement formatted = autoFormat(replacement.withPrefix(s.getPrefix()), ctx, parent);
+                return (Statement) new IndentComments().visitNonNull(formatted, 0, parent);
             }
             return s;
+        }
+    }
+
+    /**
+     * `autoFormat` indents the code but not the comments above it, which came from blocks at other depths.
+     */
+    private static class IndentComments extends GroovyIsoVisitor<Integer> {
+        @Override
+        public Space visitSpace(Space space, Space.Location loc, Integer p) {
+            if (space.getComments().isEmpty() || loc == Space.Location.BLOCK_END) {
+                return space;
+            }
+            String indent = indentation(space.getComments().get(space.getComments().size() - 1).getSuffix());
+            return indent == null ? space : indent(space, indent);
+        }
+
+        @Override
+        public J.Block visitBlock(J.Block block, Integer p) {
+            J.Block b = super.visitBlock(block, p);
+            if (b.getEnd().getComments().isEmpty() || b.getStatements().isEmpty()) {
+                return b;
+            }
+            Space last = b.getStatements().get(b.getStatements().size() - 1).getPrefix();
+            String indent = indentation(last.getComments().isEmpty() ? last.getWhitespace() :
+                    last.getComments().get(last.getComments().size() - 1).getSuffix());
+            return indent == null ? b : b.withEnd(indent(b.getEnd(), indent));
+        }
+
+        /**
+         * Indents the whitespace before each comment, leaving the indentation of what follows the last comment.
+         */
+        private static Space indent(Space space, String indent) {
+            List<Comment> comments = new ArrayList<>(space.getComments());
+            for (int i = 0; i < comments.size() - 1; i++) {
+                comments.set(i, comments.get(i).withSuffix(reindent(comments.get(i).getSuffix(), indent)));
+            }
+            return space.withWhitespace(reindent(space.getWhitespace(), indent)).withComments(comments);
+        }
+
+        private static String reindent(String whitespace, String indent) {
+            int newline = whitespace.lastIndexOf('\n');
+            return newline < 0 ? whitespace : whitespace.substring(0, newline + 1) + indent;
+        }
+
+        private static @Nullable String indentation(String whitespace) {
+            int newline = whitespace.lastIndexOf('\n');
+            return newline < 0 ? null : whitespace.substring(newline + 1);
         }
     }
 
