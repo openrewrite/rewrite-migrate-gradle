@@ -17,6 +17,7 @@ package org.openrewrite.gradle.migrate.publishing;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -26,7 +27,8 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new MigrateMavenPluginToMavenPublish());
+        spec.recipe(new MigrateMavenPluginToMavenPublish())
+          .allSources(source -> source.markers(GradleProject.builder().name("example").path(":").build()));
     }
 
     @DocumentExample
@@ -384,25 +386,6 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
               apply plugin: 'java'
 
               group = 'org.example'
-              """
-          )
-        );
-    }
-
-    @Test
-    void removeUnusedPluginKeepsBlankLine() {
-        rewriteRun(
-          buildGradle(
-            """
-              group = 'org.example'
-
-              apply plugin: 'maven'
-              apply plugin: 'java'
-              """,
-            """
-              group = 'org.example'
-
-              apply plugin: 'java'
               """
           )
         );

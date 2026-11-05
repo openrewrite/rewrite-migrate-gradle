@@ -26,6 +26,8 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.plugins.ChangePlugin;
+import org.openrewrite.gradle.plugins.RemoveBuildPlugin;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -147,7 +149,8 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     if (usesLegacyPlugin(cu, null)) {
                         return cu;
                     }
-                    return (G.CompilationUnit) new PluginVisitor(false).visitNonNull(cu, ctx);
+                    doAfterVisit(new RemoveBuildPlugin(MAVEN).getVisitor());
+                    return cu;
                 }
 
                 if (uploads.size() > 1 || usesLegacyPlugin(cu, uploads.get(0)) ||
@@ -191,8 +194,10 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 }
 
                 G.CompilationUnit g = (G.CompilationUnit) new ReplaceStatement(upload, publishing).visitNonNull(cu, ctx);
-                g = (G.CompilationUnit) new SignPublications().visitNonNull(g, ctx);
-                return (G.CompilationUnit) new PluginVisitor(!appliesPlugin(cu, MAVEN_PUBLISH)).visitNonNull(g, ctx);
+                doAfterVisit(appliesPlugin(cu, MAVEN_PUBLISH) ?
+                        new RemoveBuildPlugin(MAVEN).getVisitor() :
+                        new ChangePlugin(MAVEN, MAVEN_PUBLISH, null).getVisitor());
+                return (G.CompilationUnit) new SignPublications().visitNonNull(g, ctx);
             }
         });
     }
@@ -904,84 +909,6 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 }
             }
             return literal;
-        }
-    }
-
-    /**
-     * Switches `maven` to `maven-publish`, or removes it.
-     */
-    @Value
-    @EqualsAndHashCode(callSuper = false)
-    private static class PluginVisitor extends JavaIsoVisitor<ExecutionContext> {
-        boolean change;
-
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (!change) {
-                return m;
-            }
-            J.Literal literal = pluginLiteral(m, getCursor(), MAVEN);
-            if (literal == null || literal.getValueSource() == null) {
-                return m;
-            }
-            String source = literal.getValueSource();
-            J.Literal changed = literal.withValue(MAVEN_PUBLISH)
-                    .withValueSource(source.charAt(0) + MAVEN_PUBLISH + source.charAt(source.length() - 1));
-            return m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                if (arg == literal) {
-                    return changed;
-                }
-                if (arg instanceof G.MapEntry && ((G.MapEntry) arg).getValue() == literal) {
-                    return ((G.MapEntry) arg).withValue(changed);
-                }
-                return arg;
-            }));
-        }
-
-        @Override
-        public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-            J.Block b = super.visitBlock(block, ctx);
-            return change ? b : b.withStatements(remove(b.getStatements(), getCursor()));
-        }
-
-        @Override
-        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-            J j = super.visit(tree, ctx);
-            if (!change && j instanceof G.CompilationUnit) {
-                G.CompilationUnit cu = (G.CompilationUnit) j;
-                Cursor root = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), cu);
-                return cu.withStatements(remove(cu.getStatements(), root));
-            }
-            return j;
-        }
-
-        /**
-         * Removes the statements applying the plugin. The statement after a removed one takes over its leading
-         * whitespace when that has more line breaks, so that a blank line before the plugin stays.
-         */
-        private List<Statement> remove(List<Statement> statements, Cursor parent) {
-            List<Statement> kept = new ArrayList<>(statements.size());
-            String whitespace = null;
-            for (Statement s : statements) {
-                J.MethodInvocation m = asInvocation(s);
-                if (m != null && pluginLiteral(m, new Cursor(parent, s), MAVEN) != null) {
-                    if (whitespace == null) {
-                        whitespace = s.getPrefix().getWhitespace();
-                    }
-                    continue;
-                }
-                if (whitespace != null && lineBreaks(whitespace) > lineBreaks(s.getPrefix().getWhitespace())) {
-                    s = s.withPrefix(s.getPrefix().withWhitespace(whitespace));
-                }
-                whitespace = null;
-                kept.add(s);
-            }
-            return kept.size() == statements.size() ? statements : kept;
-        }
-
-        private static long lineBreaks(String whitespace) {
-            return whitespace.chars().filter(c -> c == '\n').count();
         }
     }
 }
