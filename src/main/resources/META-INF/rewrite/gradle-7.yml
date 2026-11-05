@@ -28,4 +28,5 @@ recipeList:
   # https://github.com/gradle/gradle/blob/v7.6.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
   - org.openrewrite.gradle.RemoveEnableFeaturePreview:
       previewFeatureName: GRADLE_METADATA
+  - org.openrewrite.gradle.migrate.artifacts.MigrateHttpRepositories
   - org.openrewrite.gradle.migrate.publishing.MigrateMavenPluginToMavenPublish
