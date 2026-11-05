@@ -45,6 +45,10 @@ name: '`gradle.properties`'
 packageName: org.openrewrite.gradle.migrate.properties
 ---
 type: specs.openrewrite.org/v1beta/category
+name: 'Publishing'
+packageName: org.openrewrite.gradle.migrate.publishing
+---
+type: specs.openrewrite.org/v1beta/category
 name: 'Code quality'
 packageName: org.openrewrite.gradle.migrate.quality
 ---
