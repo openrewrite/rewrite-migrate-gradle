@@ -29,3 +29,4 @@ recipeList:
   - org.openrewrite.gradle.RemoveEnableFeaturePreview:
       previewFeatureName: GRADLE_METADATA
   - org.openrewrite.gradle.migrate.artifacts.MigrateHttpRepositories
+  - org.openrewrite.gradle.migrate.publishing.MigrateMavenPluginToMavenPublish
