@@ -20,10 +20,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -31,12 +31,10 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.marker.Markers;
 
 import java.util.*;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public class MigrateHttpRepositories extends Recipe {
@@ -241,15 +239,10 @@ public class MigrateHttpRepositories extends Recipe {
             }
 
             private Statement allowInsecureProtocol() {
-                String property = isKotlin() ? "isAllowInsecureProtocol" : "allowInsecureProtocol";
-                return new J.Assignment(
-                        Tree.randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), property, JavaType.Primitive.Boolean, null),
-                        JLeftPadded.<Expression>build(new J.Literal(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, true, "true", null, JavaType.Primitive.Boolean))
-                                .withBefore(Space.SINGLE_SPACE),
-                        JavaType.Primitive.Boolean);
+                JavaCoordinates coordinates = getCursor().<J.MethodInvocation>getValue().getCoordinates().replace();
+                return isKotlin() ?
+                        KotlinTemplate.apply("isAllowInsecureProtocol = true", getCursor(), coordinates) :
+                        GroovyTemplate.apply("allowInsecureProtocol = true", getCursor(), coordinates);
             }
 
             private J.MethodInvocation withEmptyTrailingLambda(J.MethodInvocation m) {

@@ -266,6 +266,52 @@ class MigrateHttpRepositoriesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keepTabIndentation() {
+        rewriteRun(
+          buildGradle(
+            """
+              repositories {
+              \tmaven { url 'http://nexus.example.com/repository/maven-public/' }
+              }
+              """,
+            """
+              repositories {
+              \tmaven {
+              \t\turl 'http://nexus.example.com/repository/maven-public/'
+              \t\tallowInsecureProtocol = true
+              \t}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveFormattingOfOtherStatementsAlone() {
+        rewriteRun(
+          buildGradle(
+            """
+              repositories {
+                  maven {
+                      url 'http://nexus.example.com/repository/maven-public/'
+                      credentials{ username=nexusUser;password  =  nexusPassword }
+                  }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      url 'http://nexus.example.com/repository/maven-public/'
+                      allowInsecureProtocol = true
+                      credentials{ username=nexusUser;password  =  nexusPassword }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class KotlinDsl {
 
