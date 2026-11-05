@@ -59,7 +59,15 @@ public class MigrateHttpRepositories extends Recipe {
             "maven.aliyun.com",
             "mirrors.cloud.tencent.com",
             "repo.huaweicloud.com",
-            "mirrors.huaweicloud.com"
+            "mirrors.huaweicloud.com",
+            // These redirect `http://` to the same path over HTTPS, which Gradle 7 refuses to follow
+            "jcenter.bintray.com",
+            "repo.jenkins-ci.org",
+            "files.minecraftforge.net",
+            "repo.spongepowered.org",
+            "maven.restlet.org",
+            "raw.github.com",
+            "raw.githubusercontent.com"
     ));
 
     private static final Set<String> REPOSITORY_TYPES = new HashSet<>(asList("maven", "ivy", "jcenter", "mavenCentral"));
@@ -258,7 +266,20 @@ public class MigrateHttpRepositories extends Recipe {
                 List<Statement> statements = new ArrayList<>(body.getStatements());
                 String previous = index < 0 ? "" : statements.get(index).getPrefix().getWhitespace();
                 if (previous.contains("\n")) {
-                    statements.add(index + 1, statement.withPrefix(Space.format("\n" + previous.substring(previous.lastIndexOf('\n') + 1))));
+                    // What ends the line before, trailing whitespace or a comment, stays on that line
+                    boolean last = index + 1 == statements.size();
+                    Space following = last ? body.getEnd() : statements.get(index + 1).getPrefix();
+                    Space[] split = splitAtLineEnd(following);
+                    if (last) {
+                        body = body.withEnd(split[1]);
+                    } else {
+                        statements.set(index + 1, statements.get(index + 1).withPrefix(split[1]));
+                    }
+                    String indent = "\n" + previous.substring(previous.lastIndexOf('\n') + 1);
+                    Space prefix = split[0].getComments().isEmpty() ?
+                            Space.format(split[0].getWhitespace() + indent) :
+                            split[0].withComments(ListUtils.mapLast(split[0].getComments(), c -> c.withSuffix(indent)));
+                    statements.add(index + 1, statement.withPrefix(prefix));
                     return body.withStatements(statements);
                 }
                 String outer = indentation(statementPrefix().getWhitespace());
@@ -267,6 +288,26 @@ public class MigrateHttpRepositories extends Recipe {
                         s.withPrefix(Space.format("\n" + inner)));
                 statements.add(index + 1, statement.withPrefix(Space.format("\n" + inner)));
                 return body.withStatements(statements).withEnd(Space.format("\n" + outer));
+            }
+
+            /**
+             * Splits the space after a statement into what remains on the statement's own line, without the line
+             * break, and what starts at the line break.
+             */
+            private Space[] splitAtLineEnd(Space space) {
+                String ws = space.getWhitespace();
+                if (ws.contains("\n")) {
+                    String trailing = ws.substring(0, ws.indexOf('\n'));
+                    return new Space[]{Space.format(trailing), space.withWhitespace(ws.substring(trailing.length()))};
+                }
+                List<Comment> comments = space.getComments();
+                if (!comments.isEmpty() && !comments.get(0).isMultiline() && comments.get(0).getSuffix().startsWith("\n")) {
+                    Comment first = comments.get(0);
+                    return new Space[]{
+                            Space.build(ws, Collections.singletonList(first.withSuffix(""))),
+                            Space.build(first.getSuffix(), comments.subList(1, comments.size()))};
+                }
+                return new Space[]{Space.EMPTY, space};
             }
 
             /**
