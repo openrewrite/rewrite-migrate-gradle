@@ -118,7 +118,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         return Preconditions.check(new IsBuildGradle<>(), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof G.CompilationUnit) {
+                if (!usedElsewhere.get() && tree instanceof G.CompilationUnit) {
                     G.CompilationUnit cu = (G.CompilationUnit) tree;
                     if (!appliesPlugin(cu, MAVEN) && usesLegacyPlugin(cu, null)) {
                         usedElsewhere.set(true);
@@ -131,6 +131,10 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean usedElsewhere) {
+        // Removing or converting the plugin here would leave the other script's uses of it behind
+        if (usedElsewhere.get()) {
+            return TreeVisitor.noop();
+        }
         return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
             @Override
             public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
@@ -140,14 +144,13 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
 
                 List<J.MethodInvocation> uploads = findInvocations(cu, "uploadArchives");
                 if (uploads.isEmpty()) {
-                    if (usedElsewhere.get() || usesLegacyPlugin(cu, null)) {
+                    if (usesLegacyPlugin(cu, null)) {
                         return cu;
                     }
                     return (G.CompilationUnit) new PluginVisitor(false).visitNonNull(cu, ctx);
                 }
 
-                // Another script that uses the plugin would keep its `uploadArchives` while this one moves on
-                if (usedElsewhere.get() || uploads.size() > 1 || usesLegacyPlugin(cu, uploads.get(0)) ||
+                if (uploads.size() > 1 || usesLegacyPlugin(cu, uploads.get(0)) ||
                     !findInvocations(cu, "publishing").isEmpty()) {
                     return cu;
                 }
