@@ -1227,7 +1227,7 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
                   publications {
                       mavenJava(MavenPublication) {
                           from components.java
-                          artifactId = archivesBaseName
+                          artifactId = base.archivesName.get()
                       }
                   }
                   repositories {
@@ -1281,6 +1281,34 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
                           repository(url: "https://repo.example.org/releases")
                       }
                   }
+              }
+              """
+          )
+        );
+    }
+    @Test
+    void doNotChangeWhenArtifactTaskIsDeclaredLater() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
+
+              task packageSources(type: Jar) {
+                  classifier = 'sources'
+                  from sourceSets.main.allSource
+              }
+
+              artifacts {
+                  archives packageSources
               }
               """
           )

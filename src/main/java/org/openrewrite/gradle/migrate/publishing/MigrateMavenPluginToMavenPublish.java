@@ -221,7 +221,8 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<MigrateMave
                     return cu;
                 }
                 List<String> artifacts = archivesArtifacts(cu);
-                if (artifacts == null) {
+                // The publication refers to the tasks where `uploadArchives` was, before a task declared later exists
+                if (artifacts == null || declaresTaskAfter(cu, upload, artifacts)) {
                     return cu;
                 }
                 // `java-gradle-plugin` publishes the jar itself, as the `pluginMaven` publication
@@ -361,6 +362,38 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<MigrateMave
         }.reduce(cu, new AtomicBoolean()).get();
     }
 
+    /**
+     * Whether the script declares one of the {@code tasks} after the invocation, as in `task sourcesJar(type: Jar)`,
+     * `task('sourcesJar')` or `tasks.register('sourcesJar')`.
+     */
+    private static boolean declaresTaskAfter(G.CompilationUnit cu, J.MethodInvocation m, List<String> tasks) {
+        if (tasks.isEmpty()) {
+            return false;
+        }
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            boolean after;
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
+                if (method.getId().equals(m.getId())) {
+                    after = true;
+                    return method;
+                }
+                String name = method.getSimpleName();
+                if (after && ("task".equals(name) || "create".equals(name) || "register".equals(name)) &&
+                    !method.getArguments().isEmpty()) {
+                    Expression declared = method.getArguments().get(0);
+                    if (declared instanceof J.MethodInvocation && tasks.contains(((J.MethodInvocation) declared).getSimpleName()) ||
+                        declared instanceof J.Identifier && tasks.contains(((J.Identifier) declared).getSimpleName()) ||
+                        declared instanceof J.Literal && tasks.contains(String.valueOf(((J.Literal) declared).getValue()))) {
+                        f.set(true);
+                    }
+                }
+                return super.visitMethodInvocation(method, f);
+            }
+        }.reduce(cu, new AtomicBoolean()).get();
+    }
+
     private enum ArchivesName {
         /**
          * The script leaves the archives named after the project.
@@ -368,7 +401,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<MigrateMave
         NONE,
 
         /**
-         * The script sets `archivesBaseName` before the invocation, which can take it over as its `artifactId`.
+         * The script sets `archivesBaseName` before the invocation, which the publication takes over as its `artifactId` through `base.archivesName`, as Gradle 9 removed `archivesBaseName`.
          */
         BEFORE,
 
@@ -995,7 +1028,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<MigrateMave
                     s.append("from components.java\n");
                 }
                 if (artifactIdFromArchives) {
-                    s.append("artifactId = archivesBaseName\n");
+                    s.append("artifactId = base.archivesName.get()\n");
                 }
                 for (String artifact : artifacts) {
                     s.append("artifact ").append(artifact).append('\n');
