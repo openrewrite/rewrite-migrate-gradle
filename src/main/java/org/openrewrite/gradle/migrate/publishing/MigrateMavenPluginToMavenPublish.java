@@ -210,7 +210,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         return new JavaIsoVisitor<AtomicBoolean>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean f) {
-                if (pluginLiteral(method, getCursor(), pluginId) != null) {
+                if (isPluginApplication(method, getCursor(), pluginId)) {
                     f.set(true);
                 }
                 return super.visitMethodInvocation(method, f);
@@ -219,24 +219,20 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
     }
 
     /**
-     * The literal naming the plugin when the invocation is `apply plugin: '<id>'` or `id '<id>'` in a `plugins` block.
+     * Whether the invocation is `apply plugin: '<id>'`, or `id '<id>'` in a `plugins` block.
      */
-    private static J.@Nullable Literal pluginLiteral(J.MethodInvocation m, Cursor cursor, String pluginId) {
+    private static boolean isPluginApplication(J.MethodInvocation m, Cursor cursor, String pluginId) {
         if ("apply".equals(m.getSimpleName())) {
-            for (Expression arg : m.getArguments()) {
-                if (arg instanceof G.MapEntry && "plugin".equals(keyName((G.MapEntry) arg)) &&
-                    J.Literal.isLiteralValue(((G.MapEntry) arg).getValue(), pluginId)) {
-                    return (J.Literal) ((G.MapEntry) arg).getValue();
-                }
-            }
-        } else if ("id".equals(m.getSimpleName()) && m.getSelect() == null && m.getArguments().size() == 1 &&
-                   J.Literal.isLiteralValue(m.getArguments().get(0), pluginId)) {
-            J.MethodInvocation enclosing = cursor.getParentTreeCursor().firstEnclosing(J.MethodInvocation.class);
-            if (enclosing != null && "plugins".equals(enclosing.getSimpleName())) {
-                return (J.Literal) m.getArguments().get(0);
-            }
+            return m.getArguments().stream().anyMatch(arg -> arg instanceof G.MapEntry &&
+                    "plugin".equals(keyName((G.MapEntry) arg)) &&
+                    J.Literal.isLiteralValue(((G.MapEntry) arg).getValue(), pluginId));
         }
-        return null;
+        if ("id".equals(m.getSimpleName()) && m.getSelect() == null && m.getArguments().size() == 1 &&
+            J.Literal.isLiteralValue(m.getArguments().get(0), pluginId)) {
+            J.MethodInvocation enclosing = cursor.getParentTreeCursor().firstEnclosing(J.MethodInvocation.class);
+            return enclosing != null && "plugins".equals(enclosing.getSimpleName());
+        }
+        return false;
     }
 
     /**
