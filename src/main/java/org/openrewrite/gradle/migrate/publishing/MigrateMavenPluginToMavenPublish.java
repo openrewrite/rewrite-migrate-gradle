@@ -225,12 +225,12 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         if ("apply".equals(m.getSimpleName())) {
             for (Expression arg : m.getArguments()) {
                 if (arg instanceof G.MapEntry && "plugin".equals(keyName((G.MapEntry) arg)) &&
-                    isString(((G.MapEntry) arg).getValue(), pluginId)) {
+                    J.Literal.isLiteralValue(((G.MapEntry) arg).getValue(), pluginId)) {
                     return (J.Literal) ((G.MapEntry) arg).getValue();
                 }
             }
         } else if ("id".equals(m.getSimpleName()) && m.getSelect() == null && m.getArguments().size() == 1 &&
-                   isString(m.getArguments().get(0), pluginId)) {
+                   J.Literal.isLiteralValue(m.getArguments().get(0), pluginId)) {
             J.MethodInvocation enclosing = cursor.getParentTreeCursor().firstEnclosing(J.MethodInvocation.class);
             if (enclosing != null && "plugins".equals(enclosing.getSimpleName())) {
                 return (J.Literal) m.getArguments().get(0);
@@ -510,10 +510,6 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
             return ((J.Identifier) key).getSimpleName();
         }
         return null;
-    }
-
-    private static boolean isString(Expression e, String value) {
-        return e instanceof J.Literal && value.equals(((J.Literal) e).getValue());
     }
 
     /**
