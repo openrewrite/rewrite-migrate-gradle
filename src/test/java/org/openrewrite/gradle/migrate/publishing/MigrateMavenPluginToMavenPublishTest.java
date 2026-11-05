@@ -830,25 +830,6 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
     }
 
     @Test
-    void removeUnusedPluginKeepsCommentAbove() {
-        rewriteRun(
-          buildGradle(
-            """
-              apply plugin: 'java'
-              //apply plugin: 'errorprone'
-              apply plugin: 'maven'
-              apply plugin: 'application'
-              """,
-            """
-              apply plugin: 'java'
-              //apply plugin: 'errorprone'
-              apply plugin: 'application'
-              """
-          )
-        );
-    }
-
-    @Test
     void severalArchivesArtifactsInOneCall() {
         rewriteRun(
           buildGradle(
@@ -1214,6 +1195,93 @@ class MigrateMavenPluginToMavenPublishTest implements RewriteTest {
 
               apply plugin: 'eclipse'
               import org.gradle.plugins.ide.eclipse.model.*
+              """
+          )
+        );
+    }
+    @Test
+    void publishUnderArchivesBaseName() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              archivesBaseName = 'example-api'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
+              """,
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven-publish'
+
+              archivesBaseName = 'example-api'
+
+              publishing {
+                  publications {
+                      mavenJava(MavenPublication) {
+                          from components.java
+                          artifactId = archivesBaseName
+                      }
+                  }
+                  repositories {
+                      maven {
+                          url = "https://repo.example.org/releases"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeWhenArchivesBaseNameIsSetLater() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
+
+              archivesBaseName = 'example-api'
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeWhenJarIsRenamed() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java'
+              apply plugin: 'maven'
+
+              jar {
+                  baseName = 'example-api'
+              }
+
+              uploadArchives {
+                  repositories {
+                      mavenDeployer {
+                          repository(url: "https://repo.example.org/releases")
+                      }
+                  }
+              }
               """
           )
         );

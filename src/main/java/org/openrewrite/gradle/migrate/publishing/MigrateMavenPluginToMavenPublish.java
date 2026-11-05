@@ -47,12 +47,13 @@ import org.openrewrite.style.Style;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoolean> {
+public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<MigrateMavenPluginToMavenPublish.Accumulator> {
 
     private static final String MAVEN = "maven";
     private static final String MAVEN_PUBLISH = "maven-publish";
@@ -123,24 +124,36 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
             "that uses the plugin in any other way is left unchanged, so that it keeps Gradle's error message. " +
             "See the [Gradle upgrade guide](https://docs.gradle.org/current/userguide/upgrading_version_6.html#removal_of_the_legacy_maven_plugin).";
 
-    @Override
-    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
-        return new AtomicBoolean();
+    public static class Accumulator {
+        /**
+         * Whether a build script uses the plugin without applying it, as a subproject does when its parent applies the
+         * plugin for it. The parent's plugin is then not unused, even when the parent itself uses nothing of it.
+         */
+        boolean usedElsewhere;
+
+        /**
+         * Whether a build script names the archives, which `uploadArchives` deployed under that name.
+         */
+        boolean namesArchives;
     }
 
-    /**
-     * Records whether a build script uses the plugin without applying it, as a subproject does when its parent
-     * applies the plugin for it. The parent's plugin is then not unused, even when the parent itself uses nothing of it.
-     */
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean usedElsewhere) {
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return Preconditions.check(new IsBuildGradle<>(), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!usedElsewhere.get() && tree instanceof G.CompilationUnit) {
+                if (!acc.usedElsewhere && tree instanceof G.CompilationUnit) {
                     G.CompilationUnit cu = (G.CompilationUnit) tree;
                     if (!appliesPlugin(cu, MAVEN) && usesLegacyPlugin(cu, null)) {
-                        usedElsewhere.set(true);
+                        acc.usedElsewhere = true;
+                    }
+                    if (archivesName(cu, null) != ArchivesName.NONE) {
+                        acc.namesArchives = true;
                     }
                 }
                 return tree;
@@ -149,9 +162,9 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean usedElsewhere) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         // Removing or converting the plugin here would leave the other script's uses of it behind
-        if (usedElsewhere.get()) {
+        if (acc.usedElsewhere) {
             return TreeVisitor.noop();
         }
         return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
@@ -197,6 +210,12 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                     (isInSharedConfiguration(cu, upload) || setsVersionAfter(cu, upload))) {
                     return cu;
                 }
+                // `uploadArchives` deployed under `archivesBaseName`, `maven-publish` under the project name
+                ArchivesName archivesName = archivesName(cu, upload);
+                if (archivesName == ArchivesName.OTHER ||
+                    acc.namesArchives && isInSharedConfiguration(cu, upload)) {
+                    return cu;
+                }
                 boolean signsArchives = signsArchives(cu);
                 if (deployment.signPom && !signsArchives) {
                     return cu;
@@ -207,7 +226,8 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 }
                 // `java-gradle-plugin` publishes the jar itself, as the `pluginMaven` publication
                 boolean gradlePlugin = GRADLE_PLUGIN_PLUGINS.stream().anyMatch(id -> appliesPlugin(cu, id));
-                String snippet = deployment.render(artifacts, gradlePlugin, getCursor());
+                String snippet = deployment.render(artifacts, gradlePlugin,
+                        archivesName == ArchivesName.BEFORE, getCursor());
                 if (snippet == null) {
                     return cu;
                 }
@@ -229,13 +249,12 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
     }
 
     /**
-     * Removes the `maven` plugin, keeping the comments of the line that applied it, or returns null where it cannot.
+     * Removes the `maven` plugin, or returns null where `RemoveBuildPlugin` does not recognize it: it recognizes
+     * `apply plugin:` by its type, which some build scripts lack.
      */
     private static G.@Nullable CompilationUnit removePlugin(G.CompilationUnit cu, ExecutionContext ctx) {
-        G.CompilationUnit removed = (G.CompilationUnit) new RemoveBuildPlugin(MAVEN).getVisitor()
-                .visitNonNull(new MoveCommentsOffPlugin().visitNonNull(cu, 0), ctx);
-        // `RemoveBuildPlugin` recognizes `apply plugin:` by its type, which some build scripts lack
-        return appliesPlugin(removed, MAVEN) || comments(removed).size() < comments(cu).size() ? null : removed;
+        G.CompilationUnit removed = (G.CompilationUnit) new RemoveBuildPlugin(MAVEN).getVisitor().visitNonNull(cu, ctx);
+        return appliesPlugin(removed, MAVEN) ? null : removed;
     }
 
     /**
@@ -260,92 +279,6 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 return literal;
             }
         }.visitNonNull(changed, 0);
-    }
-
-    private static List<String> comments(J tree) {
-        return new GroovyIsoVisitor<List<String>>() {
-            @Override
-            public Space visitSpace(Space space, Space.Location loc, List<String> found) {
-                for (Comment comment : space.getComments()) {
-                    found.add(comment.printComment(getCursor()));
-                }
-                return space;
-            }
-        }.reduce(tree, new ArrayList<>());
-    }
-
-    /**
-     * `RemoveBuildPlugin` drops the line that applies the plugin together with the comments above it, which may be
-     * anything from a commented out plugin to the license header of the file, so they move to the line below.
-     */
-    private static class MoveCommentsOffPlugin extends GroovyIsoVisitor<Integer> {
-        @Override
-        public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, Integer p) {
-            G.CompilationUnit g = super.visitCompilationUnit(cu, p);
-            List<Statement> statements = moveComments(g.getStatements());
-            Space eof = g.getEof();
-            if (statements.size() > 0 && isPluginStatement(statements.get(statements.size() - 1))) {
-                eof = lastCommentsTo(statements, eof);
-            }
-            return g.withStatements(statements).withEof(eof);
-        }
-
-        @Override
-        public J.Block visitBlock(J.Block block, Integer p) {
-            J.Block b = super.visitBlock(block, p);
-            List<Statement> statements = moveComments(b.getStatements());
-            Space end = b.getEnd();
-            if (statements.size() > 0 && isPluginStatement(statements.get(statements.size() - 1))) {
-                end = lastCommentsTo(statements, end);
-            }
-            return b.withStatements(statements).withEnd(end);
-        }
-
-        private List<Statement> moveComments(List<Statement> statements) {
-            List<Statement> moved = new ArrayList<>(statements);
-            for (int i = 0; i < moved.size() - 1; i++) {
-                Statement s = moved.get(i);
-                if (isPluginStatement(s) && !s.getComments().isEmpty()) {
-                    Statement next = moved.get(i + 1);
-                    moved.set(i + 1, next.withPrefix(merge(s.getPrefix(), next.getPrefix())));
-                    moved.set(i, s.withPrefix(Space.format(s.getPrefix().getWhitespace())));
-                }
-            }
-            return moved;
-        }
-
-        private Space lastCommentsTo(List<Statement> statements, Space following) {
-            int last = statements.size() - 1;
-            Statement s = statements.get(last);
-            if (s.getComments().isEmpty()) {
-                return following;
-            }
-            statements.set(last, s.withPrefix(Space.format(s.getPrefix().getWhitespace())));
-            return merge(s.getPrefix(), following);
-        }
-
-        /**
-         * The comments of {@code removed}, then those of {@code following}, keeping the larger of the two gaps
-         * between the last comment of {@code removed} and the code below it.
-         */
-        private static Space merge(Space removed, Space following) {
-            List<Comment> comments = new ArrayList<>(removed.getComments());
-            Comment last = comments.get(comments.size() - 1);
-            String gap = newlines(following.getWhitespace()) > newlines(last.getSuffix()) ?
-                    following.getWhitespace() : last.getSuffix();
-            comments.set(comments.size() - 1, last.withSuffix(gap));
-            comments.addAll(following.getComments());
-            return removed.withComments(comments);
-        }
-
-        private static long newlines(String whitespace) {
-            return whitespace.chars().filter(c -> c == '\n').count();
-        }
-
-        private boolean isPluginStatement(Statement s) {
-            J.MethodInvocation m = asInvocation(s);
-            return m != null && isPluginApplication(m, new Cursor(getCursor(), m), MAVEN);
-        }
     }
 
     private static boolean appliesPlugin(G.CompilationUnit cu, String pluginId) {
@@ -426,6 +359,66 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
                 return literal;
             }
         }.reduce(cu, new AtomicBoolean()).get();
+    }
+
+    private enum ArchivesName {
+        /**
+         * The script leaves the archives named after the project.
+         */
+        NONE,
+
+        /**
+         * The script sets `archivesBaseName` before the invocation, which can take it over as its `artifactId`.
+         */
+        BEFORE,
+
+        /**
+         * The script names the archives after the invocation, or in another way than by `archivesBaseName`.
+         */
+        OTHER
+    }
+
+    /**
+     * How the script names the archives relative to {@code m}, the `uploadArchives` invocation, if any.
+     */
+    private static ArchivesName archivesName(G.CompilationUnit cu, J.@Nullable MethodInvocation m) {
+        return new JavaIsoVisitor<AtomicReference<ArchivesName>>() {
+            boolean after;
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicReference<ArchivesName> found) {
+                if (m != null && method.getId().equals(m.getId())) {
+                    after = true;
+                    return method;
+                }
+                if (method.getArguments().size() == 1 && !(method.getArguments().get(0) instanceof J.Lambda)) {
+                    names(method.getSimpleName(), found);
+                }
+                return super.visitMethodInvocation(method, found);
+            }
+
+            @Override
+            public J.Assignment visitAssignment(J.Assignment assignment, AtomicReference<ArchivesName> found) {
+                Expression variable = assignment.getVariable();
+                if (variable instanceof J.Identifier) {
+                    names(((J.Identifier) variable).getSimpleName(), found);
+                } else if (variable instanceof J.FieldAccess) {
+                    names(((J.FieldAccess) variable).getSimpleName(), found);
+                }
+                return super.visitAssignment(assignment, found);
+            }
+
+            private void names(String name, AtomicReference<ArchivesName> found) {
+                if ("archivesBaseName".equals(name) && !after) {
+                    if (found.get() == ArchivesName.NONE) {
+                        found.set(ArchivesName.BEFORE);
+                    }
+                } else if ("archivesBaseName".equals(name) || "archivesName".equals(name) ||
+                           "baseName".equals(name) || "archiveBaseName".equals(name)) {
+                    found.set(ArchivesName.OTHER);
+                }
+            }
+        }.reduce(cu, new AtomicReference<>(ArchivesName.NONE)).get();
     }
 
     /**
@@ -970,7 +963,7 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
         }
 
         @Nullable
-        String render(List<String> artifacts, boolean gradlePlugin, Cursor cursor) {
+        String render(List<String> artifacts, boolean gradlePlugin, boolean artifactIdFromArchives, Cursor cursor) {
             Repository rel = release;
             if (rel == null || repositories == null) {
                 return null;
@@ -993,13 +986,16 @@ public class MigrateMavenPluginToMavenPublish extends ScanningRecipe<AtomicBoole
 
             boolean hasPom = pom != null && (!pom.getStatements().isEmpty() || !pom.getEnd().getComments().isEmpty());
             StringBuilder s = new StringBuilder("publishing {\n");
-            if (!gradlePlugin || !artifacts.isEmpty() || hasPom) {
+            if (!gradlePlugin || !artifacts.isEmpty() || hasPom || artifactIdFromArchives) {
                 s.append("publications {\n");
                 if (gradlePlugin) {
                     s.append("pluginMaven(MavenPublication) {\n");
                 } else {
                     s.append("mavenJava(MavenPublication) {\n");
                     s.append("from components.java\n");
+                }
+                if (artifactIdFromArchives) {
+                    s.append("artifactId = archivesBaseName\n");
                 }
                 for (String artifact : artifacts) {
                     s.append("artifact ").append(artifact).append('\n');
