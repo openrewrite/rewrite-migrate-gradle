@@ -16,6 +16,4 @@ dependencies {
     implementation("org.openrewrite:rewrite-properties")
 
     testImplementation("org.openrewrite:rewrite-test")
-
-    testRuntimeOnly("org.openrewrite:rewrite-java-21")
 }
