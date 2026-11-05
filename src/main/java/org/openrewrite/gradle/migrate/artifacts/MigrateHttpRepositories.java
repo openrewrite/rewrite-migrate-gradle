@@ -20,22 +20,23 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
-import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinTemplate;
+import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Markers;
 
 import java.util.*;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public class MigrateHttpRepositories extends Recipe {
@@ -65,6 +66,9 @@ public class MigrateHttpRepositories extends Recipe {
 
     private static final Set<String> REPOSITORY_TYPES = new HashSet<>(asList("maven", "ivy", "jcenter", "mavenCentral"));
 
+    private static final Set<String> INSECURE_PROTOCOL_PROPERTIES = new HashSet<>(asList(
+            "allowInsecureProtocol", "setAllowInsecureProtocol", "isAllowInsecureProtocol"));
+
     @Getter
     final String displayName = "Use HTTPS or allow the insecure protocol for `http://` repositories";
 
@@ -73,12 +77,12 @@ public class MigrateHttpRepositories extends Recipe {
             "insecure protocol. A repository on a well-known public host that also serves HTTPS, such as Maven " +
             "Central, the Gradle Plugin Portal or the Aliyun mirror, switches to `https://`. Any other `http://` " +
             "repository, such as an internal repository manager or `localhost`, keeps its URL and gets " +
-            "`allowInsecureProtocol = true`, so the build keeps resolving from it.";
+            "`allowInsecureProtocol = true`, or `isAllowInsecureProtocol = true` in the Kotlin DSL, so the build " +
+            "keeps resolving from it.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        // Repository URLs are only rewritten in the Groovy DSL; GroovyVisitor skips Kotlin scripts.
-        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaVisitor<ExecutionContext>() {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -87,36 +91,50 @@ public class MigrateHttpRepositories extends Recipe {
                     return m;
                 }
                 J.Lambda closure = closure(m);
-                if (closure == null || !(closure.getBody() instanceof J.Block)) {
+                if (closure != null && !(closure.getBody() instanceof J.Block)) {
                     return m;
                 }
-                J.Block body = (J.Block) closure.getBody();
-                if (allowsInsecureProtocol(body)) {
+                J.Block body = closure == null ? null : (J.Block) closure.getBody();
+                if (body != null && allowsInsecureProtocol(body)) {
                     // The build already opted in, so it resolves on Gradle 7 as it is
                     return m;
                 }
 
-                List<Statement> statements = body.getStatements();
-                for (int i = 0; i < statements.size(); i++) {
-                    HttpUrl httpUrl = httpUrl(statements.get(i));
+                for (Expression argument : m.getArguments()) {
+                    HttpUrl httpUrl = argument == closure ? null : httpUrl(urlArgument(argument));
                     if (httpUrl == null) {
                         continue;
                     }
-                    J.Literal scheme = httpUrl.literal;
-                    J.Block newBody;
                     if (HTTPS_HOSTS.contains(httpUrl.host())) {
-                        newBody = body.withStatements(ListUtils.map(statements, s -> useHttps(s, scheme)));
-                    } else {
-                        Statement allow = allowInsecureProtocol(ctx);
-                        if (allow == null) {
-                            return m;
-                        }
-                        newBody = addAfter(body, i, allow);
+                        return m.withArguments(ListUtils.map(m.getArguments(), arg -> useHttps(arg, httpUrl.literal)));
                     }
-                    J.Lambda newClosure = closure.withBody(newBody);
-                    return m.withArguments(ListUtils.mapLast(m.getArguments(), arg -> newClosure));
+                    if (closure == null) {
+                        m = withEmptyTrailingLambda(m);
+                        closure = requireNonNull(closure(m));
+                        body = (J.Block) closure.getBody();
+                    }
+                    return withClosureBody(m, closure, addAfter(body, body.getStatements().size() - 1, allowInsecureProtocol()));
+                }
+
+                if (body == null) {
+                    return m;
+                }
+                List<Statement> statements = body.getStatements();
+                for (int i = 0; i < statements.size(); i++) {
+                    HttpUrl httpUrl = httpUrl(urlStatement(statements.get(i)));
+                    if (httpUrl == null) {
+                        continue;
+                    }
+                    J.Block newBody = HTTPS_HOSTS.contains(httpUrl.host()) ?
+                            body.withStatements(ListUtils.map(statements, s -> useHttps(s, httpUrl.literal))) :
+                            addAfter(body, i, allowInsecureProtocol());
+                    return withClosureBody(m, closure, newBody);
                 }
                 return m;
+            }
+
+            private boolean isKotlin() {
+                return getCursor().firstEnclosing(K.CompilationUnit.class) != null;
             }
 
             private boolean isInsideRepositoriesBlock() {
@@ -134,34 +152,57 @@ public class MigrateHttpRepositories extends Recipe {
                         (J.Lambda) args.get(args.size() - 1) : null;
             }
 
+            private J.MethodInvocation withClosureBody(J.MethodInvocation m, J.Lambda closure, J.Block body) {
+                J.Lambda newClosure = closure.withBody(body);
+                return m.withArguments(ListUtils.mapLast(m.getArguments(), arg -> newClosure));
+            }
+
             /**
-             * The string literal that starts the URL of {@code url ..}, {@code url(..)}, {@code setUrl(..)} or
-             * {@code url = ..}, also inside {@code uri(..)}, when it starts with {@code http://}.
+             * The URL passed as an argument in the Kotlin DSL, as in {@code maven("..")} or {@code maven(url = "..")}.
              */
-            private @Nullable HttpUrl httpUrl(Statement statement) {
+            private @Nullable Expression urlArgument(Expression argument) {
+                if (argument instanceof J.Assignment) {
+                    J.Assignment a = (J.Assignment) argument;
+                    return isUrl(a.getVariable()) ? a.getAssignment() : null;
+                }
+                return argument;
+            }
+
+            /**
+             * The URL set by {@code url ..}, {@code url(..)}, {@code setUrl(..)} or {@code url = ..}.
+             */
+            private @Nullable Expression urlStatement(Statement statement) {
                 J s = statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement;
-                Expression value = null;
                 if (s instanceof J.MethodInvocation) {
                     J.MethodInvocation mi = (J.MethodInvocation) s;
                     if (("url".equals(mi.getSimpleName()) || "setUrl".equals(mi.getSimpleName())) &&
                         mi.getSelect() == null && mi.getArguments().size() == 1) {
-                        value = mi.getArguments().get(0);
+                        return mi.getArguments().get(0);
                     }
-                } else if (s instanceof J.Assignment) {
-                    J.Assignment a = (J.Assignment) s;
-                    if (a.getVariable() instanceof J.Identifier && "url".equals(((J.Identifier) a.getVariable()).getSimpleName())) {
-                        value = a.getAssignment();
-                    }
+                } else if (s instanceof J.Assignment && isUrl(((J.Assignment) s).getVariable())) {
+                    return ((J.Assignment) s).getAssignment();
                 }
+                return null;
+            }
+
+            private boolean isUrl(Expression variable) {
+                return variable instanceof J.Identifier && "url".equals(((J.Identifier) variable).getSimpleName());
+            }
+
+            /**
+             * The string literal that starts the URL, also inside {@code uri(..)}, when it starts with {@code http://}.
+             */
+            private @Nullable HttpUrl httpUrl(@Nullable Expression value) {
                 if (value instanceof J.MethodInvocation) {
                     J.MethodInvocation uri = (J.MethodInvocation) value;
                     if ("uri".equals(uri.getSimpleName()) && uri.getSelect() == null && uri.getArguments().size() == 1) {
                         value = uri.getArguments().get(0);
                     }
                 }
-                boolean interpolated = value instanceof G.GString;
+                List<J> strings = value instanceof G.GString ? ((G.GString) value).getStrings() :
+                        value instanceof K.StringTemplate ? ((K.StringTemplate) value).getStrings() : null;
+                boolean interpolated = strings != null;
                 if (interpolated) {
-                    List<J> strings = ((G.GString) value).getStrings();
                     value = !strings.isEmpty() && strings.get(0) instanceof J.Literal ? (J.Literal) strings.get(0) : null;
                 }
                 if (value instanceof J.Literal && ((J.Literal) value).getValue() instanceof String &&
@@ -171,8 +212,9 @@ public class MigrateHttpRepositories extends Recipe {
                 return null;
             }
 
-            private Statement useHttps(Statement statement, J.Literal scheme) {
-                return (Statement) new JavaIsoVisitor<Integer>() {
+            @SuppressWarnings("unchecked")
+            private <T extends J> T useHttps(T tree, J.Literal scheme) {
+                return (T) new JavaIsoVisitor<Integer>() {
                     @Override
                     public J.Literal visitLiteral(J.Literal literal, Integer p) {
                         if (literal.getId().equals(scheme.getId())) {
@@ -183,15 +225,14 @@ public class MigrateHttpRepositories extends Recipe {
                         }
                         return literal;
                     }
-                }.visitNonNull(statement, 0);
+                }.visitNonNull(tree, 0);
             }
 
             private boolean allowsInsecureProtocol(J.Block body) {
                 return new JavaIsoVisitor<Set<Boolean>>() {
                     @Override
                     public J.Identifier visitIdentifier(J.Identifier identifier, Set<Boolean> found) {
-                        if ("allowInsecureProtocol".equals(identifier.getSimpleName()) ||
-                            "setAllowInsecureProtocol".equals(identifier.getSimpleName())) {
+                        if (INSECURE_PROTOCOL_PROPERTIES.contains(identifier.getSimpleName())) {
                             found.add(true);
                         }
                         return identifier;
@@ -199,15 +240,21 @@ public class MigrateHttpRepositories extends Recipe {
                 }.reduce(body, new HashSet<>()).contains(true);
             }
 
-            private @Nullable Statement allowInsecureProtocol(ExecutionContext ctx) {
-                return GradleParser.builder().build()
-                        .parse(ctx, "allowInsecureProtocol = true")
-                        .findFirst()
-                        .filter(G.CompilationUnit.class::isInstance)
-                        .map(cu -> ((G.CompilationUnit) cu).getStatements())
-                        .filter(parsed -> parsed.size() == 1)
-                        .map(parsed -> parsed.get(0))
-                        .orElse(null);
+            private Statement allowInsecureProtocol() {
+                String property = isKotlin() ? "isAllowInsecureProtocol" : "allowInsecureProtocol";
+                return new J.Assignment(
+                        Tree.randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), property, JavaType.Primitive.Boolean, null),
+                        JLeftPadded.<Expression>build(new J.Literal(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, true, "true", null, JavaType.Primitive.Boolean))
+                                .withBefore(Space.SINGLE_SPACE),
+                        JavaType.Primitive.Boolean);
+            }
+
+            private J.MethodInvocation withEmptyTrailingLambda(J.MethodInvocation m) {
+                J.MethodInvocation template = KotlinTemplate.apply("maven(\"\") {}", getCursor(), m.getCoordinates().replace());
+                return m.withArguments(ListUtils.concat(m.getArguments(), requireNonNull(closure(template))));
             }
 
             /**
@@ -216,7 +263,7 @@ public class MigrateHttpRepositories extends Recipe {
              */
             private J.Block addAfter(J.Block body, int index, Statement statement) {
                 List<Statement> statements = new ArrayList<>(body.getStatements());
-                String previous = statements.get(index).getPrefix().getWhitespace();
+                String previous = index < 0 ? "" : statements.get(index).getPrefix().getWhitespace();
                 if (previous.contains("\n")) {
                     statements.add(index + 1, statement.withPrefix(Space.format("\n" + previous.substring(previous.lastIndexOf('\n') + 1))));
                     return body.withStatements(statements);
@@ -231,7 +278,7 @@ public class MigrateHttpRepositories extends Recipe {
 
             /**
              * The prefix of the statement holding the visited invocation, which is an implicit {@code return} when the
-             * invocation is the last statement of a closure.
+             * invocation is the last statement of a Groovy closure.
              */
             private Space statementPrefix() {
                 Object parent = getCursor().getParentTreeCursor().getValue();

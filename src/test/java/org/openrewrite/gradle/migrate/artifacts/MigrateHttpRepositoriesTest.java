@@ -22,7 +22,9 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 
 class MigrateHttpRepositoriesTest implements RewriteTest {
 
@@ -265,6 +267,178 @@ class MigrateHttpRepositoriesTest implements RewriteTest {
     }
 
     @Nested
+    class KotlinDsl {
+
+        @Test
+        void useHttpsForPublicHostAndAllowInsecureProtocolOtherwise() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  repositories {
+                      maven { url = uri("http://repo.spring.io/milestone") }
+                      maven {
+                          url = uri("http://nexus.example.com/repository/maven-public/")
+                          credentials {
+                              username = "user"
+                          }
+                      }
+                  }
+                  """,
+                """
+                  repositories {
+                      maven { url = uri("https://repo.spring.io/milestone") }
+                      maven {
+                          url = uri("http://nexus.example.com/repository/maven-public/")
+                          isAllowInsecureProtocol = true
+                          credentials {
+                              username = "user"
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void allowInsecureProtocolInLambdaOnOneLine() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  repositories {
+                      maven { setUrl("http://nexus.example.com/repository/maven-public/") }
+                  }
+                  """,
+                """
+                  repositories {
+                      maven {
+                          setUrl("http://nexus.example.com/repository/maven-public/")
+                          isAllowInsecureProtocol = true
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void useHttpsForUrlArgument() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  repositories {
+                      maven("http://plugins.gradle.org/m2/")
+                      maven(url = "http://maven.aliyun.com/repository/public")
+                  }
+                  """,
+                """
+                  repositories {
+                      maven("https://plugins.gradle.org/m2/")
+                      maven(url = "https://maven.aliyun.com/repository/public")
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void allowInsecureProtocolInNewLambdaForUrlArgument() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  repositories {
+                      maven("http://nexus.example.com/repository/maven-public/")
+                      maven(url = "http://localhost:8081/repository/maven-snapshots/")
+                  }
+                  """,
+                """
+                  repositories {
+                      maven("http://nexus.example.com/repository/maven-public/") {
+                          isAllowInsecureProtocol = true
+                      }
+                      maven(url = "http://localhost:8081/repository/maven-snapshots/") {
+                          isAllowInsecureProtocol = true
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void allowInsecureProtocolInExistingLambdaForUrlArgument() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  repositories {
+                      maven("http://nexus.example.com/repository/maven-public/") {
+                          credentials {
+                              username = "user"
+                          }
+                      }
+                  }
+                  """,
+                """
+                  repositories {
+                      maven("http://nexus.example.com/repository/maven-public/") {
+                          credentials {
+                              username = "user"
+                          }
+                          isAllowInsecureProtocol = true
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void allowInsecureProtocolForInterpolatedHost() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  val nexusHost = "nexus.example.com"
+                  repositories {
+                      maven { url = uri("http://${nexusHost}/repository/maven-public/") }
+                  }
+                  """,
+                """
+                  val nexusHost = "nexus.example.com"
+                  repositories {
+                      maven {
+                          url = uri("http://${nexusHost}/repository/maven-public/")
+                          isAllowInsecureProtocol = true
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void useHttpsInSettings() {
+            rewriteRun(
+              settingsGradleKts(
+                """
+                  pluginManagement {
+                      repositories {
+                          maven("http://maven.aliyun.com/repository/gradle-plugin")
+                      }
+                  }
+                  """,
+                """
+                  pluginManagement {
+                      repositories {
+                          maven("https://maven.aliyun.com/repository/gradle-plugin")
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class NoChange {
 
         @Test
@@ -280,6 +454,25 @@ class MigrateHttpRepositoriesTest implements RewriteTest {
                       maven {
                           allowInsecureProtocol = true
                           url 'http://maven.aliyun.com/repository/public'
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void insecureProtocolAlreadyAllowedInKotlin() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  repositories {
+                      maven {
+                          url = uri("http://nexus.example.com/repository/maven-public/")
+                          isAllowInsecureProtocol = true
+                      }
+                      maven("http://maven.aliyun.com/repository/public") {
+                          isAllowInsecureProtocol = true
                       }
                   }
                   """
