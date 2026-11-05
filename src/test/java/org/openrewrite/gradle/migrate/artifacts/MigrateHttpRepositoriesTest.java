@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.migrate.artifacts;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -243,26 +244,6 @@ class MigrateHttpRepositoriesTest implements RewriteTest {
     }
 
     @Test
-    void doNotChangeWhenInsecureProtocolIsAllowed() {
-        rewriteRun(
-          buildGradle(
-            """
-              repositories {
-                  maven {
-                      url 'http://nexus.example.com/repository/maven-public/'
-                      allowInsecureProtocol true
-                  }
-                  maven {
-                      allowInsecureProtocol = true
-                      url 'http://maven.aliyun.com/repository/public'
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void allowInsecureProtocolForJcenterWithUrl() {
         rewriteRun(
           buildGradle(
@@ -283,39 +264,63 @@ class MigrateHttpRepositoriesTest implements RewriteTest {
         );
     }
 
-    @Test
-    void doNotChangeHttpsRepository() {
-        rewriteRun(
-          buildGradle(
-            """
-              repositories {
-                  maven { url 'https://nexus.example.com/repository/maven-public/' }
-              }
-              """
-          )
-        );
-    }
+    @Nested
+    class NoChange {
 
-    @Test
-    void doNotChangeUrlOutsideRepositories() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'maven-publish'
-              }
+        @Test
+        void insecureProtocolAlreadyAllowed() {
+            rewriteRun(
+              buildGradle(
+                """
+                  repositories {
+                      maven {
+                          url 'http://nexus.example.com/repository/maven-public/'
+                          allowInsecureProtocol true
+                      }
+                      maven {
+                          allowInsecureProtocol = true
+                          url 'http://maven.aliyun.com/repository/public'
+                      }
+                  }
+                  """
+              )
+            );
+        }
 
-              publishing {
-                  publications {
-                      maven(MavenPublication) {
-                          pom {
-                              url = 'http://www.example.com'
+        @Test
+        void httpsRepository() {
+            rewriteRun(
+              buildGradle(
+                """
+                  repositories {
+                      maven { url 'https://nexus.example.com/repository/maven-public/' }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void urlOutsideRepositories() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'maven-publish'
+                  }
+
+                  publishing {
+                      publications {
+                          maven(MavenPublication) {
+                              pom {
+                                  url = 'http://www.example.com'
+                              }
                           }
                       }
                   }
-              }
-              """
-          )
-        );
+                  """
+              )
+            );
+        }
     }
 }
