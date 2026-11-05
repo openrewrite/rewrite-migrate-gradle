@@ -41,19 +41,13 @@ import static java.util.Collections.singletonList;
 @EqualsAndHashCode(callSuper = false)
 public class RewriteSpreadAllInConfigurationsBlock extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Replace spread-`all*` calls in `configurations` blocks with `configurations.all { }`";
-    }
+    String displayName = "Replace spread-`all*` calls in `configurations` blocks with `configurations.all { }`";
 
-    @Override
-    public String getDescription() {
-        return "Gradle 9 throws `Cannot mutate the dependencies of configuration ':all' after the configuration was resolved.` " +
-                "when a `configurations { }` closure uses Groovy's spread-dot form `all*.<method>(args)`. " +
-                "Rewrite each such call to the closure form `configurations.all { <method>(args) }`, which preserves " +
-                "eager-`all` semantics but is accepted by Gradle 9. Only applied when every statement in the " +
-                "`configurations { }` block uses the spread form; mixed blocks are left untouched for manual review.";
-    }
+    String description = "Gradle 9 throws `Cannot mutate the dependencies of configuration ':all' after the configuration was resolved.` " +
+            "when a `configurations { }` closure uses Groovy's spread-dot form `all*.<method>(args)`. " +
+            "Rewrite each such call to the closure form `configurations.all { <method>(args) }`, which preserves " +
+            "eager-`all` semantics but is accepted by Gradle 9. Only applied when every statement in the " +
+            "`configurations { }` block uses the spread form; mixed blocks are left untouched for manual review.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

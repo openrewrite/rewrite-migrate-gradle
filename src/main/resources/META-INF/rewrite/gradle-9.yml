@@ -52,5 +52,7 @@ recipeList:
   - org.openrewrite.gradle.migrate.application.RemoveExitEnvironmentVar
   # RepositoryHandler.flatDir(Map) / mavenCentral(Map) are deprecated in 9.6 in favor of the Action overloads
   - org.openrewrite.gradle.migrate.artifacts.UseRepositoryHandlerActionOverloads
+  # Kotlin DSL container delegates such as `by tasks.registering` are deprecated in 9.6
+  - org.openrewrite.gradle.migrate.kotlindsl.UseContainerMethodsInsteadOfDelegates
   # The org.gradle.unsafe.isolated-projects* properties are deprecated in 9.7
   - org.openrewrite.gradle.migrate.properties.MigrateIsolatedProjectsProperties
