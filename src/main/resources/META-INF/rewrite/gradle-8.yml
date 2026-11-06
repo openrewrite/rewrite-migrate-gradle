@@ -33,6 +33,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.tasks.MigrateArchiveClassifier
   # Gradle 8.0 removed these; must run before UseAssignmentForPropertySyntax turns `version 'x'` into a project-looking `version = 'x'`
   - org.openrewrite.gradle.migrate.tasks.MigrateArchiveTaskProperties
+  # Gradle 8.0 removed these, except TestReport.destinationDir which Gradle 9 removes; all replacements work on Gradle 8
+  - org.openrewrite.gradle.migrate.tasks.MigrateTaskOutputProperties
   # https://docs.gradle.org/8.11.1/userguide/upgrading_version_8.html#test_framework_implementation_dependencies
   - org.openrewrite.gradle.AddJUnitPlatformLauncher
   # https://github.com/gradle/gradle/blob/v7.6.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
