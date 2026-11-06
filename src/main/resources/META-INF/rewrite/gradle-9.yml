@@ -27,6 +27,8 @@ recipeList:
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
+  # IdeaModule.testSourceDirs and testResourceDirs are removed in 9.0
+  - org.openrewrite.gradle.migrate.idea.UseIdeaModuleTestSources
   - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
   - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
