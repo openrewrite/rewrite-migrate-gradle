@@ -23,11 +23,11 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
-class UseApplicationBlockForDefaultJvmArgsTest implements RewriteTest {
+class UseApplicationBlockForConventionPropertiesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UseApplicationBlockForDefaultJvmArgs());
+        spec.recipe(new UseApplicationBlockForConventionProperties());
     }
 
     @DocumentExample
@@ -299,6 +299,80 @@ class UseApplicationBlockForDefaultJvmArgsTest implements RewriteTest {
             """
               project(':app').applicationDefaultJvmArgs = ['-Dx=1']
               settings.applicationDefaultJvmArgs = ['-Dx=1']
+              """
+          )
+        );
+    }
+
+    @Test
+    void applicationNameMovesIntoTheBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'application'
+              }
+
+              applicationName = rootProject.name
+              """,
+            """
+              plugins {
+                  id 'application'
+              }
+
+              application {
+                  applicationName = rootProject.name
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void executableDirMovesIntoTheBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'application'
+              }
+
+              executableDir = 'bin'
+              """,
+            """
+              plugins {
+                  id 'application'
+              }
+
+              application {
+                  executableDir = 'bin'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shadowingOnePropertyLeavesTheOthersAlone() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'application'
+              }
+
+              def applicationName = 'mine'
+              executableDir = 'bin'
+              """,
+            """
+              plugins {
+                  id 'application'
+              }
+
+              def applicationName = 'mine'
+              application {
+                  executableDir = 'bin'
+              }
               """
           )
         );
