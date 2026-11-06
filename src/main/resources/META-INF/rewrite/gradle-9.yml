@@ -64,3 +64,5 @@ recipeList:
   - org.openrewrite.gradle.migrate.properties.AddToolingParallelProperty
   # Configuration.visible has no effect since 9.0 and is deprecated, for removal in 11
   - org.openrewrite.gradle.migrate.artifacts.RemoveConfigurationVisible
+  # Provider.forUseAtConfigurationTime() is gone in Gradle 9; it was already a no-op from 7.4
+  - org.openrewrite.gradle.migrate.providers.RemoveForUseAtConfigurationTime
