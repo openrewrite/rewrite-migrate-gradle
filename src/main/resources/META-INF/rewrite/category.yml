@@ -37,6 +37,10 @@ name: 'Java plugin'
 packageName: org.openrewrite.gradle.migrate.java
 ---
 type: specs.openrewrite.org/v1beta/category
+name: 'Kotlin DSL and Kotlin plugin'
+packageName: org.openrewrite.gradle.migrate.kotlin
+---
+type: specs.openrewrite.org/v1beta/category
 name: 'Kotlin DSL'
 packageName: org.openrewrite.gradle.migrate.kotlindsl
 ---
