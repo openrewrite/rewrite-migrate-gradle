@@ -37,8 +37,16 @@ name: 'Java plugin'
 packageName: org.openrewrite.gradle.migrate.java
 ---
 type: specs.openrewrite.org/v1beta/category
+name: 'Kotlin DSL'
+packageName: org.openrewrite.gradle.migrate.kotlindsl
+---
+type: specs.openrewrite.org/v1beta/category
 name: '`gradle.properties`'
 packageName: org.openrewrite.gradle.migrate.properties
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'Publishing'
+packageName: org.openrewrite.gradle.migrate.publishing
 ---
 type: specs.openrewrite.org/v1beta/category
 name: 'Code quality'
@@ -47,3 +55,7 @@ packageName: org.openrewrite.gradle.migrate.quality
 type: specs.openrewrite.org/v1beta/category
 name: 'Tasks'
 packageName: org.openrewrite.gradle.migrate.tasks
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'Script plugins'
+packageName: org.openrewrite.gradle.migrate.scripts
