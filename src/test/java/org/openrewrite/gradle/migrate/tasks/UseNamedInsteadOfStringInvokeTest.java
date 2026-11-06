@@ -98,4 +98,22 @@ class UseNamedInsteadOfStringInvokeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotChangeGroovyBuilderInvocations() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              extensions.findByName("mavenPublishing")?.withGroovyBuilder {
+                  "signAllPublications"()
+
+                  "pom" {
+                      setProperty("name", "Example")
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }
