@@ -52,10 +52,13 @@ public class RemoveForUseAtConfigurationTime extends Recipe {
                 if (!METHOD_NAME.equals(m.getSimpleName()) || provider == null || hasArguments(m) || !isOnProvider(m)) {
                     return m;
                 }
-                if (getCursor().firstEnclosing(J.CompilationUnit.class) != null &&
-                    getCursor().getParentTreeCursor().getValue() instanceof J.Block &&
+                if (getCursor().getParentTreeCursor().getValue() instanceof J.Block &&
                     !(provider instanceof J.MethodInvocation)) {
-                    // `provider;` is not a statement in Java
+                    // The call is the whole statement and what it was made on cannot stand as one:
+                    // `provider;` is not a statement in Java, and in no language is a bare
+                    // `J.Identifier` a `Statement`, so leaving one among a block's statements makes
+                    // an LST that cannot even be serialized. Groovy gives a closure's trailing
+                    // expression a `J.Return` of its own, so this does not reach that.
                     return null;
                 }
                 return provider.withPrefix(m.getPrefix());
