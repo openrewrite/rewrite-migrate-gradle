@@ -226,6 +226,98 @@ class RemoveForUseAtConfigurationTimeTest implements RewriteTest {
     }
 
     @Test
+    void groovyCallAsAStatementLeavesNoBareExpression() {
+        rewriteRun(
+          groovy(
+            """
+              class PropertyUtils {
+                  static def providerFor(project, propertyName) {
+                      def provider = project.provider({ -> null })
+                      if (GradleVersion.current() >= GradleVersion.version("6.5")) {
+                          provider.forUseAtConfigurationTime()
+                      }
+                      return provider
+                  }
+              }
+              """,
+            """
+              class PropertyUtils {
+                  static def providerFor(project, propertyName) {
+                      def provider = project.provider({ -> null })
+                      if (GradleVersion.current() >= GradleVersion.version("6.5")) {
+                      }
+                      return provider
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyCallOnAFieldAccessAsAStatementLeavesNoBareExpression() {
+        rewriteRun(
+          groovy(
+            """
+              class Plugin {
+                  def read() {
+                      this.provider.forUseAtConfigurationTime()
+                      return this.provider
+                  }
+              }
+              """,
+            """
+              class Plugin {
+                  def read() {
+                      return this.provider
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void aClosureOfOneExpressionKeepsTheProvider() {
+        rewriteRun(
+          buildGradle(
+            """
+              def provider = providers.systemProperty('foo')
+              def foo = { provider.forUseAtConfigurationTime() }
+              """,
+            """
+              def provider = providers.systemProperty('foo')
+              def foo = { provider }
+              """
+          )
+        );
+    }
+
+    @Test
+    void theTrailingExpressionOfAClosureKeepsTheProvider() {
+        // Groovy gives a closure's trailing expression a `J.Return` of its own, which can hold the
+        // provider, so the closure still yields it.
+        rewriteRun(
+          buildGradle(
+            """
+              def provider = providers.systemProperty('foo')
+              def foo = {
+                  logger.lifecycle('reading')
+                  provider.forUseAtConfigurationTime()
+              }
+              """,
+            """
+              def provider = providers.systemProperty('foo')
+              def foo = {
+                  logger.lifecycle('reading')
+                  provider
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotChangeAMethodOfTheSameNameOnAnotherType() {
         rewriteRun(
           java(
