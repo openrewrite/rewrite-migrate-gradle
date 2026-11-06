@@ -15,6 +15,8 @@
  */
 package org.openrewrite.gradle.migrate.plugins;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -31,16 +33,13 @@ import org.openrewrite.semver.VersionComparator;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class UpgradeShadowPlugin extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Upgrade Shadow for Gradle 9";
-    }
 
-    @Override
-    public String getDescription() {
-        return "Migrate literal Shadow plugin declarations to the maintained GradleUp plugin and a Gradle 9 compatible version, preserving newer versions.";
-    }
+    String displayName = "Upgrade Shadow for Gradle 9";
+
+    String description = "Migrate literal Shadow plugin declarations to the maintained GradleUp plugin and a Gradle 9 compatible version, preserving newer versions.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

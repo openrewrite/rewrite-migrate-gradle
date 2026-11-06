@@ -15,6 +15,8 @@
  */
 package org.openrewrite.gradle.migrate.tasks;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -39,18 +41,15 @@ import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Uses the merging API; assigning a replacement map is intentionally not equivalent. */
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class UseManifestAttributes extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Use the Gradle Manifest attributes merging API";
-    }
 
-    @Override
-    public String getDescription() {
-        return "Replace Groovy Gradle Manifest `attributes += map` with `attributes(map)`. " +
-               "Gradle 9 makes the attributes property read-only. Only discarded assignments with Manifest " +
-               "attribution or an unshadowed canonical jar/manifest configuration are migrated.";
-    }
+    String displayName = "Use the Gradle Manifest attributes merging API";
+
+    String description = "Replace Groovy Gradle Manifest `attributes += map` with `attributes(map)`. " +
+            "Gradle 9 makes the attributes property read-only. Only discarded assignments with Manifest " +
+            "attribution or an unshadowed canonical jar/manifest configuration are migrated.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

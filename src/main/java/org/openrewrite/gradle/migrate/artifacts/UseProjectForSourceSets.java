@@ -15,6 +15,8 @@
  */
 package org.openrewrite.gradle.migrate.artifacts;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -41,21 +43,18 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** ProjectDependency no longer delegates Project properties in Gradle 9. */
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class UseProjectForSourceSets extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Use safe project source-set dependencies";
-    }
 
-    @Override
-    public String getDescription() {
-        return "Replace direct Groovy `compileOnly project(':path').sourceSets.main.runtimeClasspath` declarations " +
-               "with the project's consumable `runtimeElements` dependency and task-backed main output. This retains " +
-               "classes, resources and runtime dependencies without resolving another project's configuration, " +
-               "which Gradle 9 forbids during parallel execution. Other non-resolving sourceSets reads use an explicit Project " +
-               "lookup. Only literal absolute paths in unshadowed canonical dependencies configurations are migrated; " +
-               "ordinary project dependencies are retained.";
-    }
+    String displayName = "Use safe project source-set dependencies";
+
+    String description = "Replace direct Groovy `compileOnly project(':path').sourceSets.main.runtimeClasspath` declarations " +
+            "with the project's consumable `runtimeElements` dependency and task-backed main output. This retains " +
+            "classes, resources and runtime dependencies without resolving another project's configuration, " +
+            "which Gradle 9 forbids during parallel execution. Other non-resolving sourceSets reads use an explicit Project " +
+            "lookup. Only literal absolute paths in unshadowed canonical dependencies configurations are migrated; " +
+            "ordinary project dependencies are retained.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

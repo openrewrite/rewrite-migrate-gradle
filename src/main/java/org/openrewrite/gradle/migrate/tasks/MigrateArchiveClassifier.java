@@ -41,17 +41,12 @@ import java.util.UUID;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class MigrateArchiveClassifier extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Migrate archive task classifier";
-    }
 
-    @Override
-    public String getDescription() {
-        return "Replace legacy classifier assignments and setter calls with archiveClassifier in proven Groovy archive task closures. " +
-               "Recognize typed task declarations and same-file task configuration calls, including nested task calls in omitted-parentheses " +
-               "artifact syntax. Preserve MavenArtifact classifier properties. Dynamic task types and cross-file task declarations are not inferred.";
-    }
+    String displayName = "Migrate archive task classifier";
+
+    String description = "Replace legacy classifier assignments and setter calls with archiveClassifier in proven Groovy archive task closures. " +
+            "Recognize typed task declarations and same-file task configuration calls, including nested task calls in omitted-parentheses " +
+            "artifact syntax. Preserve MavenArtifact classifier properties. Dynamic task types and cross-file task declarations are not inferred.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
