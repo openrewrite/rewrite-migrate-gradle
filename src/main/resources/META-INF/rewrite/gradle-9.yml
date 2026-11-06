@@ -26,6 +26,8 @@ recipeList:
       addIfMissing: false
   # Legacy Shadow versions use APIs removed in Gradle 9
   - org.openrewrite.gradle.migrate.plugins.UpgradeShadowPlugin
+  # jcenter() was removed in 9.0; JCenter has redirected to Maven Central since August 2024
+  - org.openrewrite.gradle.migrate.artifacts.UseMavenCentralInsteadOfJcenter
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.migrate.artifacts.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
