@@ -182,4 +182,31 @@ class AddRootProjectNameTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void createsSettingsForARootBuildWithNone() {
+        rewriteRun(
+          buildGradle("plugins { id 'java' }", named("my-service")),
+          settingsGradle(
+            null,
+            """
+              rootProject.name = 'my-service'
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotCreateSettingsForANestedBuild() {
+        rewriteRun(
+          // Its own build, with its own root project, which the repository root's name does not describe
+          buildGradle(
+            "plugins { id 'java' }",
+            spec -> spec.path("samples/hello/build.gradle").markers(GradleProject.builder()
+                    .name("hello")
+                    .path(":")
+                    .build())
+          )
+        );
+    }
 }

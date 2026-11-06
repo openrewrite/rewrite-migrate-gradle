@@ -16,6 +16,8 @@
 package org.openrewrite.gradle.migrate.settings;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
@@ -37,7 +39,9 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.tree.ParseError;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 
 @Value
@@ -76,6 +80,12 @@ public class AddRootProjectName extends ScanningRecipe<AddRootProjectName.Accumu
     public static class Accumulator {
         @Nullable
         String resolvedName;
+
+        /** The root build script, when the repository root holds one, and whether it is already accompanied by settings. */
+        @Nullable
+        Path rootBuildFile;
+
+        boolean rootSettingsExist;
     }
 
     @Override
@@ -88,12 +98,23 @@ public class AddRootProjectName extends ScanningRecipe<AddRootProjectName.Accumu
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile) || acc.resolvedName != null) {
+                if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
                 SourceFile s = (SourceFile) tree;
                 // Only the root build script's marker names the root project; a subproject's names itself.
                 if (s.getSourcePath().getParent() != null) {
+                    return tree;
+                }
+                String path = s.getSourcePath().toString();
+                if (path.endsWith("settings.gradle") || path.endsWith("settings.gradle.kts")) {
+                    acc.rootSettingsExist = true;
+                    return tree;
+                }
+                if (s instanceof JavaSourceFile) {
+                    acc.rootBuildFile = s.getSourcePath();
+                }
+                if (acc.resolvedName != null) {
                     return tree;
                 }
                 s.getMarkers().findFirst(GradleProject.class)
@@ -103,6 +124,24 @@ public class AddRootProjectName extends ScanningRecipe<AddRootProjectName.Accumu
                 return tree;
             }
         };
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+        // Only a build at the repository root: a nested build has its own root project, which this name does not
+        // describe. Nothing is invented either - without a resolved name there is nothing to write.
+        String name = StringUtils.isBlank(rootProjectName) ? acc.resolvedName : rootProjectName;
+        if (acc.rootBuildFile == null || acc.rootSettingsExist || name == null || !SAFE_NAME.matcher(name).matches()) {
+            return emptyList();
+        }
+        boolean kotlin = acc.rootBuildFile.toString().endsWith(".kts");
+        String quote = kotlin ? "\"" : "'";
+        Path path = Paths.get(kotlin ? "settings.gradle.kts" : "settings.gradle");
+        return GradleParser.builder().build()
+                .parseInputs(singletonList(Parser.Input.fromString(path,
+                        "rootProject.name = " + quote + name + quote + "\n")), null, ctx)
+                .map(SourceFile.class::cast)
+                .collect(toList());
     }
 
     @Override
