@@ -27,7 +27,7 @@ recipeList:
   # Legacy Shadow versions use APIs removed in Gradle 9
   - org.openrewrite.gradle.migrate.plugins.UpgradeShadowPlugin
   # Map notation has been deprecated in 9.1+
-  - org.openrewrite.gradle.DependencyUseStringNotation
+  - org.openrewrite.gradle.migrate.artifacts.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
   - org.openrewrite.gradle.migrate.java.UseJavaExtensionBlock
