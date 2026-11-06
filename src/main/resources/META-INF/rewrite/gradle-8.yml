@@ -28,6 +28,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.artifacts.UseExtendsFromForConfigurationDependencies
   # Gradle 8.0 removed the Configuration extensions on NamedDomainObjectProvider<Configuration> from the Kotlin DSL
   - org.openrewrite.gradle.migrate.artifacts.UseGetOnConfigurationAccessors
+  # Gradle 8.0 removed Substitution.with(ComponentSelector) in favor of using; with still works on 7.6
+  - org.openrewrite.gradle.migrate.artifacts.UseUsingForDependencySubstitution
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup
   - org.openrewrite.gradle.migrate.jacoco.JacocoReportDeprecations
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#v7_java_exec_api_cleanup
