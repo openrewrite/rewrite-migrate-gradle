@@ -31,6 +31,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
   - org.openrewrite.gradle.migrate.java.UseJavaExtensionBlock
+  # BasePluginConvention was removed in Gradle 9; archivesBaseName, libsDirName and distsDirName no longer work
+  - org.openrewrite.gradle.migrate.base.UseBaseExtensionBlock
   - org.openrewrite.gradle.migrate.artifacts.RewriteSpreadAllInConfigurationsBlock
   # Manifest.attributes is read-only in Gradle 9; use the merging method instead of +=
   - org.openrewrite.gradle.migrate.tasks.UseManifestAttributes
