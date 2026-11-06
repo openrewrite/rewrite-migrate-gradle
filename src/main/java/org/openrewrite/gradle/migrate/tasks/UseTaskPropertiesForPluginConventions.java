@@ -45,15 +45,16 @@ public class UseTaskPropertiesForPluginConventions extends Recipe {
 
     private static final String WEB_APP_DIR_NAME = "webAppDirName";
     private static final String APP_DIR_NAME = "appDirName";
+    private static final String LIB_DIR_NAME = "libDirName";
     private static final String PROJECT_REPORT_DIR_NAME = "projectReportDirName";
-    private static final Set<String> PROPERTIES = new HashSet<>(Arrays.asList(WEB_APP_DIR_NAME, APP_DIR_NAME, PROJECT_REPORT_DIR_NAME));
+    private static final Set<String> PROPERTIES = new HashSet<>(Arrays.asList(WEB_APP_DIR_NAME, APP_DIR_NAME, LIB_DIR_NAME, PROJECT_REPORT_DIR_NAME));
     private static final Set<String> PROJECT_BLOCKS = new HashSet<>(Arrays.asList(
             "subprojects", "allprojects", "project", "afterEvaluate", "withId", "withPlugin"));
 
     String displayName = "Configure the `war`, `ear` and project report tasks instead of their plugin conventions";
 
     String description = "`WarPluginConvention`, `EarPluginConvention` and `ProjectReportsPluginConvention` are deprecated since " +
-            "Gradle 8.2 and removed in Gradle 9, so assigning `webAppDirName`, `appDirName` or `projectReportDirName` on the project " +
+            "Gradle 8.2 and removed in Gradle 9, so assigning `webAppDirName`, `appDirName`, `libDirName` or `projectReportDirName` on the project " +
             "warns on Gradle 8.14 in Groovy, fails on Gradle 9 in Groovy, and does not compile in Kotlin on Gradle 8.14 or 9. " +
             "Each assignment becomes configuration of the task, as the upgrade guide says. A script that declares its own `War` or " +
             "`Ear` task gets `tasks.withType(..).configureEach { }`, because the convention reached those tasks too and `war { }` " +
@@ -109,8 +110,15 @@ public class UseTaskPropertiesForPluginConventions extends Recipe {
                 boolean war = WEB_APP_DIR_NAME.equals(property);
                 String task = war ? "war" : "ear";
                 String type = war ? "War" : "Ear";
-                String directory = war ? "webAppDirectory" : "appDirectory";
-                String body = kotlin ? directory + ".set(file(#{any()}))" : directory + " = file(#{any()})";
+                String body;
+                if (LIB_DIR_NAME.equals(property)) {
+                    // `Ear.libDirName` is a plain `String` where the others are directory properties,
+                    // so the value crosses unchanged and needs no `file(..)` or `.set(..)`
+                    body = LIB_DIR_NAME + " = #{any()}";
+                } else {
+                    String directory = war ? "webAppDirectory" : "appDirectory";
+                    body = kotlin ? directory + ".set(file(#{any()}))" : directory + " = file(#{any()})";
+                }
                 String block;
                 if (customTaskTypes.contains(type)) {
                     block = kotlin ? "tasks.withType<" + type + ">().configureEach" : "tasks.withType(" + type + ").configureEach";
