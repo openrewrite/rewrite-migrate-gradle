@@ -45,6 +45,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.tasks.UseNamedInsteadOfStringInvoke
   # The Kotlin 2 compiler in 9.0 no longer resolves script labels such as this@Build_gradle
   - org.openrewrite.gradle.migrate.kotlin.UseProjectInsteadOfBuildScriptLabel
+  # WriteProperties.outputFile is removed in 9.0
+  - org.openrewrite.gradle.migrate.tasks.UseWritePropertiesDestinationFile
   - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
   - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
