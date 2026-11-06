@@ -24,6 +24,8 @@ recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 8.x
       addIfMissing: false
+  # Gradle 8.0 no longer allows a Configuration as a dependency; 6.9 and 7.6 show that it amounted to extendsFrom
+  - org.openrewrite.gradle.migrate.artifacts.UseExtendsFromForConfigurationDependencies
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup
   - org.openrewrite.gradle.migrate.jacoco.JacocoReportDeprecations
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#v7_java_exec_api_cleanup
