@@ -358,4 +358,67 @@ class UseTaskPropertiesForPluginConventionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void libDirNameMovesIntoTheEarTask() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'ear'
+              }
+
+              libDirName = 'myLib'
+              """,
+            """
+              plugins {
+                  id 'ear'
+              }
+
+              ear {
+                  libDirName = 'myLib'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void libDirNameInKotlin() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  id("ear")
+              }
+
+              libDirName = "myLib"
+              """,
+            """
+              plugins {
+                  id("ear")
+              }
+
+              tasks.ear {
+                  libDirName = "myLib"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeAScriptsOwnLibDirName() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'ear'
+              }
+
+              def libDirName = 'mine'
+              """
+          )
+        );
+    }
 }
