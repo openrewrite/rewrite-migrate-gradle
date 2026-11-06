@@ -39,18 +39,26 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import static java.util.Collections.emptySet;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UseApplicationBlockForDefaultJvmArgs extends Recipe {
+public class UseApplicationBlockForConventionProperties extends Recipe {
 
-    private static final String PROPERTY = "applicationDefaultJvmArgs";
+    /**
+     * The writable properties of the removed {@code ApplicationPluginConvention}. {@code mainClassName} is
+     * {@link UseMainClassPropertyForApplication}'s, and {@code applicationDistribution} is read-only.
+     */
+    private static final Set<String> PROPERTIES = new HashSet<>(Arrays.asList(
+            "applicationName", "applicationDefaultJvmArgs", "executableDir"));
     private static final Set<String> PROJECT_BLOCKS = new HashSet<>(Arrays.asList(
             "subprojects", "allprojects", "project", "afterEvaluate", "withId", "withPlugin"));
 
-    String displayName = "Move `applicationDefaultJvmArgs` into the `application { }` block";
+    String displayName = "Move the `application` convention properties into the `application { }` block";
 
     String description = "`ApplicationPluginConvention` is deprecated since Gradle 8.2 and removed in Gradle 9, so assigning " +
-            "`applicationDefaultJvmArgs` on the project warns on Gradle 8.14 in Groovy, fails on Gradle 9 in Groovy, and does not " +
+            "`applicationName`, `applicationDefaultJvmArgs` or `executableDir` on the project warns on Gradle 8.14 in Groovy, " +
+            "fails on Gradle 9 in Groovy with `Could not set unknown property`, and does not " +
             "compile in Kotlin on Gradle 8.14 or 9. The assignment moves into the `application { }` block. Kotlin uses " +
             "`configure<JavaApplication> { }` where the script's own `plugins { }` block does not apply `application`, because " +
             "only then does the type-safe accessor exist. `+=`, reads, and a script's own `def`, `val` or `ext` of the same name " +
@@ -59,13 +67,13 @@ public class UseApplicationBlockForDefaultJvmArgs extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
-            private boolean shadowed;
+            private Set<String> shadowed = emptySet();
             private boolean kotlinAccessor;
 
             @Override
             public J preVisit(J tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    shadowed = isShadowed(tree);
+                    shadowed = shadowedProperties(tree);
                     kotlinAccessor = tree instanceof K.CompilationUnit && appliesApplicationPlugin(tree);
                 }
                 return tree;
@@ -73,7 +81,8 @@ public class UseApplicationBlockForDefaultJvmArgs extends Recipe {
 
             @Override
             public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
-                if (shadowed || !assignsProperty(assignment.getVariable())) {
+                String property = assignedProperty(assignment.getVariable());
+                if (property == null || shadowed.contains(property)) {
                     return super.visitAssignment(assignment, ctx);
                 }
                 Scope scope = scope();
@@ -82,23 +91,26 @@ public class UseApplicationBlockForDefaultJvmArgs extends Recipe {
                 }
                 boolean kotlin = getCursor().firstEnclosing(JavaSourceFile.class) instanceof K.CompilationUnit;
                 String block = kotlin && (scope == Scope.PROJECT || !kotlinAccessor) ? "configure<JavaApplication>" : "application";
-                String snippet = block + " {\n    " + PROPERTY + " = #{any()}\n}";
+                String snippet = block + " {\n    " + property + " = #{any()}\n}";
                 JavaTemplate template = kotlin ? KotlinTemplate.builder(snippet).build() : GroovyTemplate.builder(snippet).build();
                 // The value travels as a parameter rather than as text, so a `#{` inside it cannot be mistaken for a placeholder
                 return template.apply(getCursor(), assignment.getCoordinates().replace(),
                         assignment.getAssignment().withPrefix(Space.EMPTY));
             }
 
-            private boolean assignsProperty(Expression variable) {
+            private @Nullable String assignedProperty(Expression variable) {
                 if (variable instanceof J.Identifier) {
-                    return PROPERTY.equals(((J.Identifier) variable).getSimpleName());
+                    String name = ((J.Identifier) variable).getSimpleName();
+                    return PROPERTIES.contains(name) ? name : null;
                 }
                 if (variable instanceof J.FieldAccess) {
                     J.FieldAccess field = (J.FieldAccess) variable;
-                    return PROPERTY.equals(field.getSimpleName()) && field.getTarget() instanceof J.Identifier &&
-                            "project".equals(((J.Identifier) field.getTarget()).getSimpleName());
+                    if (PROPERTIES.contains(field.getSimpleName()) && field.getTarget() instanceof J.Identifier &&
+                        "project".equals(((J.Identifier) field.getTarget()).getSimpleName())) {
+                        return field.getSimpleName();
+                    }
                 }
-                return false;
+                return null;
             }
 
             private Scope scope() {
@@ -152,35 +164,45 @@ public class UseApplicationBlockForDefaultJvmArgs extends Recipe {
     }
 
     /**
-     * A script's own variable, or an extra property, of the same name was never the convention's property.
+     * A script's own variable, or an extra property, of the same name was never the convention's property. One
+     * shadowed name says nothing about the others, so each is tracked on its own.
      */
-    private static boolean isShadowed(J tree) {
-        boolean[] shadowed = {false};
+    private static Set<String> shadowedProperties(J tree) {
+        Set<String> shadowed = new HashSet<>();
         new JavaIsoVisitor<Integer>() {
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
-                shadowed[0] |= PROPERTY.equals(variable.getSimpleName());
+                record(variable.getSimpleName());
                 return super.visitVariable(variable, p);
             }
 
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
-                shadowed[0] |= PROPERTY.equals(fieldAccess.getSimpleName()) && isExt(fieldAccess.getTarget());
+                if (isExt(fieldAccess.getTarget())) {
+                    record(fieldAccess.getSimpleName());
+                }
                 return super.visitFieldAccess(fieldAccess, p);
             }
 
             @Override
             public J.Assignment visitAssignment(J.Assignment assignment, Integer p) {
                 J.MethodInvocation owner = getCursor().firstEnclosing(J.MethodInvocation.class);
-                shadowed[0] |= owner != null && "ext".equals(owner.getSimpleName()) && assignment.getVariable() instanceof J.Identifier &&
-                        PROPERTY.equals(((J.Identifier) assignment.getVariable()).getSimpleName());
+                if (owner != null && "ext".equals(owner.getSimpleName()) && assignment.getVariable() instanceof J.Identifier) {
+                    record(((J.Identifier) assignment.getVariable()).getSimpleName());
+                }
                 return super.visitAssignment(assignment, p);
+            }
+
+            private void record(String name) {
+                if (PROPERTIES.contains(name)) {
+                    shadowed.add(name);
+                }
             }
 
             private boolean isExt(@Nullable Expression target) {
                 return target instanceof J.Identifier && "ext".equals(((J.Identifier) target).getSimpleName());
             }
         }.visit(tree, 0);
-        return shadowed[0];
+        return shadowed;
     }
 }
