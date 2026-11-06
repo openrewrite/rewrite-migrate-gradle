@@ -33,6 +33,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.java.UseCompileOptionsProperties
   # kotlinOptions does not compile with the kotlin-dsl plugin 6.7.6 that Gradle 9.8 uses
   - org.openrewrite.gradle.migrate.kotlin.UseCompilerOptionsWithKotlinDsl
+  # CopyProcessingSpec.fileMode and dirMode are removed in 9.0
+  - org.openrewrite.gradle.migrate.tasks.UseFilePermissions
   - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
   - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
