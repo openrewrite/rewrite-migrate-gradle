@@ -94,10 +94,17 @@ public class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContex
         }
         if (variable instanceof J.FieldAccess) {
             J.FieldAccess fieldAccess = (J.FieldAccess) variable;
-            return propertyName.equals(fieldAccess.getSimpleName()) &&
+            return propertyName.equals(fieldAccess.getSimpleName()) && !isExtraProperty(fieldAccess.getTarget()) &&
                     (namesOwner(fieldAccess.getTarget()) || isInsideOwnerBlock());
         }
         return false;
+    }
+
+    /**
+     * A script's own {@code ext.prop} merely shares the deprecated property's name.
+     */
+    private static boolean isExtraProperty(Expression target) {
+        return target instanceof J.Identifier && "ext".equals(((J.Identifier) target).getSimpleName());
     }
 
     private boolean namesOwner(@Nullable Expression expression) {
