@@ -45,6 +45,8 @@ recipeList:
       previewFeatureName: VERSION_CATALOGS
   # https://docs.gradle.org/8.14/userguide/upgrading_version_8.html#groovy_space_assignment_syntax
   - org.openrewrite.gradle.migrate.UseAssignmentForPropertySyntax
+  # The org.gradle.unsafe.configuration-cache* properties were renamed in 8.1; the legacy names still work on 9.8.2
+  - org.openrewrite.gradle.migrate.properties.MigrateConfigurationCacheProperties
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.migrate.UseAssignmentForPropertySyntax
