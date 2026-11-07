@@ -60,9 +60,7 @@ public class UseAssignmentForRepositoryUrl extends Recipe {
                 if (!"url".equals(m.getSimpleName()) || m.getSelect() != null || !isDirectlyInRepository(getCursor())) {
                     return m;
                 }
-                // The parser's model of the Gradle DSL declares `url(Object)` on its repository spec, which Gradle's own
-                // `MavenArtifactRepository` does not, and core leaves a call alone when it resolves to a declared method.
-                J assigned = (J) assignment.visit(m.withMethodType(null), ctx, getCursor().getParentOrThrow());
+                J assigned = (J) assignment.visit(m, ctx, getCursor().getParentOrThrow());
                 return assigned instanceof J.Assignment ? assigned : m;
             }
         });
