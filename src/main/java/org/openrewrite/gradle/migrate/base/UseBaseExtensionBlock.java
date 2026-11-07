@@ -24,6 +24,7 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.migrate.internal.MovedExpressions;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
@@ -143,7 +144,10 @@ public class UseBaseExtensionBlock extends Recipe {
                 }
                 JavaTemplate template = kotlin ? KotlinTemplate.builder(snippet).build() : GroovyTemplate.builder(snippet).build();
                 // The value travels as a parameter rather than as text, so a `#{` inside it cannot be mistaken for a placeholder
-                return template.apply(getCursor(), statement.getCoordinates().replace(), value.withPrefix(Space.EMPTY));
+                Expression parameter = value.withPrefix(Space.EMPTY);
+                J applied = template.apply(getCursor(), statement.getCoordinates().replace(), parameter);
+                // Inside `base { }` already the assignment stays where it is; otherwise a block goes round it
+                return MovedExpressions.reindent(applied, parameter, getCursor(), scope == Scope.BASE ? 0 : 1);
             }
 
             private Scope scope() {
