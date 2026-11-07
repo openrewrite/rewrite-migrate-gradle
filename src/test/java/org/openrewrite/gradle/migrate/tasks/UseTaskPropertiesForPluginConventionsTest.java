@@ -421,4 +421,30 @@ class UseTaskPropertiesForPluginConventionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multiLineValueKeepsItsOwnIndentation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'war'
+              }
+
+              webAppDirName = 'src/' +
+                  'main/webapp'
+              """,
+            """
+              plugins {
+                  id 'war'
+              }
+
+              war {
+                  webAppDirectory = file('src/' +
+                      'main/webapp')
+              }
+              """
+          )
+        );
+    }
 }
