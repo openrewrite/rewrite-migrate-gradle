@@ -24,6 +24,7 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.migrate.internal.MovedExpressions;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
@@ -98,7 +99,9 @@ public class UseTaskPropertiesForPluginConventions extends Recipe {
                 String snippet = snippet(property, kotlin, scope);
                 JavaTemplate template = kotlin ? KotlinTemplate.builder(snippet).build() : GroovyTemplate.builder(snippet).build();
                 // The value travels as a parameter rather than as text, so a `#{` inside it cannot be mistaken for a placeholder
-                return template.apply(getCursor(), assignment.getCoordinates().replace(), value);
+                J applied = template.apply(getCursor(), assignment.getCoordinates().replace(), value);
+                // Every snippet above wraps the assignment in a block, so the value sits one level deeper than it was written
+                return MovedExpressions.reindent(applied, value, getCursor(), 1);
             }
 
             private String snippet(String property, boolean kotlin, Scope scope) {
