@@ -26,6 +26,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.migrate.internal.MovedExpressions;
 import org.openrewrite.groovy.GroovyTemplate;
+import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
@@ -35,6 +36,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.KotlinTemplate;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.Arrays;
@@ -55,7 +57,8 @@ public class UseBaseExtensionBlock extends Recipe {
     String description = "Gradle 9 removed the `BasePluginConvention` (deprecated in 8.2), so setting `archivesBaseName`, " +
             "`libsDirName` or `distsDirName` on the project fails. Each becomes a `Property` of the `base { }` block: " +
             "`archivesName`, and `libsDirectory` and `distsDirectory` resolved against `layout.buildDirectory`. " +
-            "Reads of these properties, and assignments inside task configuration, are left for review. " +
+            "A read of `archivesBaseName` becomes `base.archivesName.get()`, since the property it read is gone too. " +
+            "Reads of the directory properties, and assignments inside task configuration, are left for review. " +
             "See the [Gradle upgrade guide](https://docs.gradle.org/8.14/userguide/upgrading_version_8.html#base_convention_deprecation) for more information.";
 
     @Override
@@ -108,6 +111,73 @@ public class UseBaseExtensionBlock extends Recipe {
                     }
                 }
                 return super.visitMethodInvocation(method, ctx);
+            }
+
+            @Override
+            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                if (isArchivesBaseName(fieldAccess.getSimpleName()) && isProjectReceiver(fieldAccess.getTarget()) &&
+                    !isAssignedTo(fieldAccess) && groovy()) {
+                    return readOfArchivesName(fieldAccess);
+                }
+                return super.visitFieldAccess(fieldAccess, ctx);
+            }
+
+            @Override
+            public J visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                if (isArchivesBaseName(identifier.getSimpleName()) && isBareRead(identifier) && groovy()) {
+                    return readOfArchivesName(identifier);
+                }
+                return super.visitIdentifier(identifier, ctx);
+            }
+
+            /**
+             * `archivesBaseName` is gone from the project in Gradle 9, so a read of it fails just as an assignment
+             * does. The `base { }` block that replaces the assignment keeps the value, and this is how to get at it.
+             */
+            private J readOfArchivesName(Expression read) {
+                J replacement = GroovyTemplate.builder("base.archivesName.get()").build()
+                        .apply(getCursor(), read.getCoordinates().replace());
+                // `println archivesBaseName` prints without parentheses only while its argument carries the marker
+                for (Marker marker : read.getMarkers().getMarkers()) {
+                    if (marker instanceof OmitParentheses || marker instanceof org.openrewrite.java.marker.OmitParentheses) {
+                        replacement = replacement.withMarkers(replacement.getMarkers().add(marker));
+                    }
+                }
+                return replacement;
+            }
+
+            private boolean isArchivesBaseName(String name) {
+                return ARCHIVES_BASE_NAME.equals(name) && !shadowed.contains(ARCHIVES_BASE_NAME);
+            }
+
+            private boolean groovy() {
+                return !(getCursor().firstEnclosing(JavaSourceFile.class) instanceof K.CompilationUnit);
+            }
+
+            /**
+             * The left hand side of an assignment is not a read. `visitAssignment` rewrites the ones this recipe
+             * migrates and leaves the rest alone, so reaching one here means it is being left alone deliberately.
+             */
+            private boolean isAssignedTo(Expression expression) {
+                Cursor parent = getCursor().getParentTreeCursor();
+                return parent.getValue() instanceof J.Assignment &&
+                       ((J.Assignment) parent.getValue()).getVariable().getId().equals(expression.getId());
+            }
+
+            private boolean isBareRead(J.Identifier identifier) {
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                if (parent instanceof J.Assignment) {
+                    return !((J.Assignment) parent).getVariable().getId().equals(identifier.getId());
+                }
+                if (parent instanceof J.MethodInvocation) {
+                    // The name of `archivesBaseName 'x'`, which `visitMethodInvocation` has already left alone
+                    return !((J.MethodInvocation) parent).getName().getId().equals(identifier.getId());
+                }
+                if (parent instanceof J.FieldAccess) {
+                    // `project.archivesBaseName`, which `visitFieldAccess` takes as a whole
+                    return !((J.FieldAccess) parent).getName().getId().equals(identifier.getId());
+                }
+                return !(parent instanceof J.VariableDeclarations.NamedVariable);
             }
 
             private @Nullable String propertyAssigned(Expression variable) {

@@ -366,6 +366,80 @@ class UseBaseExtensionBlockTest implements RewriteTest {
         );
     }
 
+    @Test
+    void readBecomesTheBaseExtensionProperty() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              archivesBaseName = 'gradle'
+
+              println archivesBaseName
+              println project.archivesBaseName
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              base {
+                  archivesName = 'gradle'
+              }
+
+              println base.archivesName.get()
+              println base.archivesName.get()
+              """
+          )
+        );
+    }
+
+    @Test
+    void readInsideAPublication() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'maven-publish'
+              }
+
+              archivesBaseName = 'jmix-masquerade'
+
+              publishing {
+                  publications {
+                      javaMaven(MavenPublication) {
+                          artifactId = archivesBaseName
+                          from components.java
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'maven-publish'
+              }
+
+              base {
+                  archivesName = 'jmix-masquerade'
+              }
+
+              publishing {
+                  publications {
+                      javaMaven(MavenPublication) {
+                          artifactId = base.archivesName.get()
+                          from components.java
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class NoChange {
         @Test
@@ -435,21 +509,6 @@ class UseBaseExtensionBlockTest implements RewriteTest {
                   jar {
                       archivesBaseName = 'gradle'
                   }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void readIsLeftAlone() {
-            rewriteRun(
-              buildGradle(
-                """
-                  plugins {
-                      id 'java'
-                  }
-
-                  println archivesBaseName
                   """
               )
             );
