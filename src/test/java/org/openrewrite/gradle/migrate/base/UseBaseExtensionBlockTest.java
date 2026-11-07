@@ -304,6 +304,68 @@ class UseBaseExtensionBlockTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiLineValueKeepsItsOwnIndentation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              archivesBaseName = [
+                  'gradle',
+                  'core'
+              ].join('-')
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              base {
+                  archivesName = [
+                      'gradle',
+                      'core'
+                  ].join('-')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiLineValueWithinExistingBaseBlockStaysWhereItIs() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              base {
+                  archivesBaseName = [
+                      'gradle',
+                      'core'
+                  ].join('-')
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              base {
+                  archivesName = [
+                      'gradle',
+                      'core'
+                  ].join('-')
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class NoChange {
         @Test
