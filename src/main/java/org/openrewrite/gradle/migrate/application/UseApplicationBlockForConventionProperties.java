@@ -24,6 +24,7 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.migrate.internal.MovedExpressions;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
@@ -94,8 +95,9 @@ public class UseApplicationBlockForConventionProperties extends Recipe {
                 String snippet = block + " {\n    " + property + " = #{any()}\n}";
                 JavaTemplate template = kotlin ? KotlinTemplate.builder(snippet).build() : GroovyTemplate.builder(snippet).build();
                 // The value travels as a parameter rather than as text, so a `#{` inside it cannot be mistaken for a placeholder
-                return template.apply(getCursor(), assignment.getCoordinates().replace(),
-                        assignment.getAssignment().withPrefix(Space.EMPTY));
+                Expression value = assignment.getAssignment().withPrefix(Space.EMPTY);
+                J applied = template.apply(getCursor(), assignment.getCoordinates().replace(), value);
+                return MovedExpressions.reindent(applied, value, getCursor(), 1);
             }
 
             private @Nullable String assignedProperty(Expression variable) {

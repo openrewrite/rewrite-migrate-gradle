@@ -377,4 +377,124 @@ class UseApplicationBlockForConventionPropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multiLineListKeepsItsOwnIndentation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'application'
+              }
+
+              applicationDefaultJvmArgs = [
+                  '-Dapp.home=GRAPHOUSE_APP_HOME',
+                  '-XX:+HeapDumpOnOutOfMemoryError', '-XX:HeapDumpPath=GRAPHOUSE_APP_HOME/log/',
+                  '-showversion', '-server'
+              ]
+              """,
+            """
+              plugins {
+                  id 'application'
+              }
+
+              application {
+                  applicationDefaultJvmArgs = [
+                      '-Dapp.home=GRAPHOUSE_APP_HOME',
+                      '-XX:+HeapDumpOnOutOfMemoryError', '-XX:HeapDumpPath=GRAPHOUSE_APP_HOME/log/',
+                      '-showversion', '-server'
+                  ]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiLineListKeepsItsOwnIndentationInKotlin() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  application
+              }
+
+              applicationDefaultJvmArgs = listOf(
+                  "-Dapp.home=GRAPHOUSE_APP_HOME",
+                  "-showversion",
+                  "-server"
+              )
+              """,
+            """
+              plugins {
+                  application
+              }
+
+              application {
+                  applicationDefaultJvmArgs = listOf(
+                      "-Dapp.home=GRAPHOUSE_APP_HOME",
+                      "-showversion",
+                      "-server"
+                  )
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiLineListAlreadyIndentedInsideSubprojects() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects {
+                  apply plugin: 'application'
+                  applicationDefaultJvmArgs = [
+                      '-Xmx1g',
+                      '-server'
+                  ]
+              }
+              """,
+            """
+              subprojects {
+                  apply plugin: 'application'
+                  application {
+                      applicationDefaultJvmArgs = [
+                          '-Xmx1g',
+                          '-server'
+                      ]
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiLineListWithAClosingBracketOnTheLastElementsLine() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'application'
+              }
+
+              applicationDefaultJvmArgs = [
+                  '-Xmx1g',
+                  '-server']
+              """,
+            """
+              plugins {
+                  id 'application'
+              }
+
+              application {
+                  applicationDefaultJvmArgs = [
+                      '-Xmx1g',
+                      '-server']
+              }
+              """
+          )
+        );
+    }
 }
