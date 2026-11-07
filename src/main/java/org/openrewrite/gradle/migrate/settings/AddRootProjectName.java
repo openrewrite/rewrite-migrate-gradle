@@ -61,21 +61,15 @@ public class AddRootProjectName extends ScanningRecipe<AddRootProjectName.Accumu
     @Nullable
     String rootProjectName;
 
-    @Override
-    public String getDisplayName() {
-        return "Name the root project";
-    }
+    String displayName = "Name the root project";
 
-    @Override
-    public String getDescription() {
-        return "Assign `rootProject.name` in the settings file. Left unset, the root project is named after the " +
-               "directory it sits in, so moving or cloning the build into a differently named directory silently " +
-               "renames the project, changing published artifact names and the paths of its subprojects. The name " +
-               "written is the one Gradle already resolved, taken from the `GradleProject` marker, so this pins " +
-               "current behaviour rather than changing it; where that is unavailable the recipe makes no change " +
-               "rather than guess a name. See the " +
-               "[Gradle best practice](https://docs.gradle.org/current/userguide/best_practices_general.html#name_your_root_project).";
-    }
+    String description = "Assign `rootProject.name` in the settings file. Left unset, the root project is named " +
+            "after the directory it sits in, so moving or cloning the build into a differently named directory " +
+            "silently renames the project, changing published artifact names and the paths of its subprojects. The " +
+            "name written is the one Gradle already resolved, taken from the `GradleProject` marker, so this pins " +
+            "current behaviour rather than changing it; where that is unavailable the recipe makes no change " +
+            "rather than guess a name. See the " +
+            "[Gradle best practice](https://docs.gradle.org/current/userguide/best_practices_general.html#name_your_root_project).";
 
     public static class Accumulator {
         @Nullable

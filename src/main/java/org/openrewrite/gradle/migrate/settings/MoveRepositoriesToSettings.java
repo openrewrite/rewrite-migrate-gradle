@@ -46,14 +46,9 @@ import static java.util.Collections.singletonList;
 @EqualsAndHashCode(callSuper = false)
 public class MoveRepositoriesToSettings extends ScanningRecipe<MoveRepositoriesToSettings.Accumulator> {
 
-    @Override
-    public String getDisplayName() {
-        return "Declare dependency repositories in the settings file";
-    }
+    String displayName = "Declare dependency repositories in the settings file";
 
-    @Override
-    public String getDescription() {
-        return "Move a build script's top-level `repositories` block into `dependencyResolutionManagement` in the " +
+    String description = "Move a build script's top-level `repositories` block into `dependencyResolutionManagement` in the " +
                "settings file, so the build has one place that says where dependencies come from and a project " +
                "cannot quietly resolve from somewhere the rest of the build does not. Deliberately narrow, because " +
                "the risk is all in the cases it declines: a build with more than one project is left alone, since " +
@@ -64,12 +59,8 @@ public class MoveRepositoriesToSettings extends ScanningRecipe<MoveRepositoriesT
                "multi-project configuration whatever the build looks like today. A settings file that already " +
                "declares `dependencyResolutionManagement` is left for a person to merge. See the " +
                "[Gradle best practice](https://docs.gradle.org/current/userguide/best_practices_dependencies.html#set_up_repositories_in_settings).";
-    }
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(10);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(10);
 
     public static class Accumulator {
         boolean multiProject;
