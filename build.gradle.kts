@@ -18,8 +18,4 @@ dependencies {
     testImplementation("org.openrewrite:rewrite-test")
     testImplementation("org.openrewrite.gradle.tooling:model:${rewriteVersion}")
     testImplementation(gradleApi())
-
-    // #45 removed this on the premise that the build plugin supplies it. It does not: without it every test
-    // whose script parses Java source fails, on main as well as here.
-    testRuntimeOnly("org.openrewrite:rewrite-java-21")
 }
