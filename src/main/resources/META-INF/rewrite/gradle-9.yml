@@ -64,6 +64,9 @@ recipeList:
   - org.openrewrite.gradle.migrate.kotlindsl.UseContainerMethodsInsteadOfDelegates
   # The org.gradle.unsafe.isolated-projects* properties are deprecated in 9.7
   - org.openrewrite.gradle.migrate.properties.MigrateIsolatedProjectsProperties
+  # Project.container(Class) only warns until Gradle 10, and ObjectFactory rejects element classes it accepts, such as a final
+  # class in another file, which the recipe cannot see. Run it on its own and check the build.
+  # - org.openrewrite.gradle.migrate.model.UseObjectFactoryDomainObjectContainer
   # Configuration.visible has no effect since 9.0 and is deprecated, for removal in 11
   - org.openrewrite.gradle.migrate.artifacts.RemoveConfigurationVisible
   # Implicit parallel model building through org.gradle.parallel is deprecated in 9.8 and an error in 10
