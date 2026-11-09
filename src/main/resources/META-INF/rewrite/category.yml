@@ -45,6 +45,8 @@ name: 'Kotlin DSL'
 packageName: org.openrewrite.gradle.migrate.kotlindsl
 ---
 type: specs.openrewrite.org/v1beta/category
+name: 'Domain object containers'
+packageName: org.openrewrite.gradle.migrate.model
 name: 'Plugins'
 packageName: org.openrewrite.gradle.migrate.plugins
 ---
