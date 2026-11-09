@@ -31,6 +31,8 @@ recipeList:
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
+  # JvmVendorSpec.IBM_SEMERU is removed in 9.0; on 8.14 it is the same vendor as IBM
+  - org.openrewrite.gradle.migrate.java.UseJvmVendorSpecIbm
   # CopyProcessingSpec.fileMode and dirMode are removed in 9.0
   - org.openrewrite.gradle.migrate.tasks.UseFilePermissions
   - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
