@@ -54,6 +54,8 @@ recipeList:
   - org.openrewrite.gradle.plugins.UpgradePluginVersion:
       pluginIdPattern: io.spring.dependency-management
       newVersion: 1.1.7
+  # Adding artifacts to the archives configuration is deprecated in 9.1 and fails in 10
+  - org.openrewrite.gradle.migrate.artifacts.UseAssembleDependsOnInsteadOfArchives
   # Using a Project object as a dependency notation is deprecated in 9.6 and fails in 10
   - org.openrewrite.gradle.migrate.artifacts.UseProjectPathForDependencyNotation
   # PMD's targetJdk is deprecated in 9.6 and has no replacement
