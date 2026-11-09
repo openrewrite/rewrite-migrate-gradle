@@ -1,0 +1,43 @@
+#
+# Copyright 2026 the original author or authors.
+# <p>
+# Licensed under the Moderne Source Available License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://docs.moderne.io/licensing/moderne-source-available-license
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.migrate.properties.MigrateConfigurationCacheProperties
+displayName: Rename the incubating `org.gradle.unsafe.configuration-cache` properties
+description: >-
+  Gradle 8.1 promotes the configuration cache out of incubation and renames its properties.
+  `org.gradle.unsafe.configuration-cache` becomes `org.gradle.configuration-cache`,
+  `org.gradle.unsafe.configuration-cache-problems` becomes `org.gradle.configuration-cache.problems` and
+  `org.gradle.unsafe.configuration-cache.max-problems` becomes `org.gradle.configuration-cache.max-problems`.
+  The legacy names are scheduled for removal, and both Gradle 8.14.4 and 9.8.2 still honor them without a warning.
+  See the [Gradle upgrade guide](https://docs.gradle.org/current/userguide/upgrading_version_8.html#configuration_caching_options_renamed) for more information.
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: '**/gradle.properties'
+recipeList:
+  - org.openrewrite.properties.ChangePropertyKey:
+      oldPropertyKey: org.gradle.unsafe.configuration-cache.max-problems
+      newPropertyKey: org.gradle.configuration-cache.max-problems
+      relaxedBinding: false
+  - org.openrewrite.properties.ChangePropertyKey:
+      oldPropertyKey: org.gradle.unsafe.configuration-cache-problems
+      newPropertyKey: org.gradle.configuration-cache.problems
+      relaxedBinding: false
+  - org.openrewrite.properties.ChangePropertyKey:
+      oldPropertyKey: org.gradle.unsafe.configuration-cache
+      newPropertyKey: org.gradle.configuration-cache
+      relaxedBinding: false
