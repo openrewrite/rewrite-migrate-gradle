@@ -25,6 +25,10 @@ name: 'Application plugin'
 packageName: org.openrewrite.gradle.migrate.application
 ---
 type: specs.openrewrite.org/v1beta/category
+name: 'Base plugin'
+packageName: org.openrewrite.gradle.migrate.base
+---
+type: specs.openrewrite.org/v1beta/category
 name: 'Dependencies and repositories'
 packageName: org.openrewrite.gradle.migrate.artifacts
 ---
@@ -39,6 +43,10 @@ packageName: org.openrewrite.gradle.migrate.java
 type: specs.openrewrite.org/v1beta/category
 name: 'Kotlin DSL'
 packageName: org.openrewrite.gradle.migrate.kotlindsl
+---
+type: specs.openrewrite.org/v1beta/category
+name: 'Plugins'
+packageName: org.openrewrite.gradle.migrate.plugins
 ---
 type: specs.openrewrite.org/v1beta/category
 name: '`gradle.properties`'
