@@ -21,8 +21,10 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
+import static org.openrewrite.properties.Assertions.properties;
 
 class MigratePluginPublishPluginTest implements RewriteTest {
 
@@ -257,6 +259,175 @@ class MigratePluginPublishPluginTest implements RewriteTest {
         );
     }
 
+    @Test
+    void declareThePluginsOnlyPluginBundleNames() {
+        rewriteRun(
+          spec -> spec.afterRecipe(run -> assertThat(run.getChangeset().getAllResults())
+            .anySatisfy(result -> {
+                assertThat(result.getBefore()).isNotNull();
+                assertThat(result.getBefore().getSourcePath()).hasToString(
+                  "src/main/resources/META-INF/gradle-plugins/com.acme.widget.properties");
+                assertThat(result.getAfter()).as("the descriptor Gradle now generates").isNull();
+            })),
+          properties(
+            "implementation-class=com.acme.WidgetPlugin\n",
+            null,
+            spec -> spec.path("src/main/resources/META-INF/gradle-plugins/com.acme.widget.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-gradle-plugin'
+                  id 'com.gradle.plugin-publish' version '0.16.0'
+              }
+
+              pluginBundle {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  description = 'Does a thing'
+                  tags = ['acme']
+                  version = project.version
+
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          displayName = 'Widget'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java-gradle-plugin'
+                  id 'com.gradle.plugin-publish' version '1.3.1'
+              }
+
+              gradlePlugin {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                          description = 'Does a thing'
+                          tags = ['acme']
+                          displayName = 'Widget'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteTheDescriptorTheDeclarationMakesRedundant() {
+        rewriteRun(
+          spec -> spec.afterRecipe(run -> assertThat(run.getChangeset().getAllResults())
+            .anySatisfy(result -> {
+                assertThat(result.getBefore()).isNotNull();
+                assertThat(result.getBefore().getSourcePath()).hasToString(
+                  "src/main/resources/META-INF/gradle-plugins/com.acme.widget.properties");
+                assertThat(result.getAfter()).as("the descriptor Gradle now generates").isNull();
+            })),
+          properties(
+            "implementation-class=com.acme.WidgetPlugin\n",
+            null,
+            spec -> spec.path("src/main/resources/META-INF/gradle-plugins/com.acme.widget.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-gradle-plugin'
+                  id 'com.gradle.plugin-publish' version '0.12.0'
+              }
+
+              pluginBundle {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  tags = ['acme']
+              }
+
+              gradlePlugin {
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java-gradle-plugin'
+                  id 'com.gradle.plugin-publish' version '1.3.1'
+              }
+
+              gradlePlugin {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                          tags = ['acme']
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepADescriptorForADifferentImplementationClass() {
+        rewriteRun(
+          properties(
+            "implementation-class=com.acme.OtherPlugin\n",
+            spec -> spec.path("src/main/resources/META-INF/gradle-plugins/com.acme.widget.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-gradle-plugin'
+                  id 'com.gradle.plugin-publish' version '0.12.0'
+              }
+
+              pluginBundle {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+              }
+
+              gradlePlugin {
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java-gradle-plugin'
+                  id 'com.gradle.plugin-publish' version '1.3.1'
+              }
+
+              gradlePlugin {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class NoChange implements RewriteTest {
 
@@ -436,6 +607,61 @@ class MigratePluginPublishPluginTest implements RewriteTest {
                           create("widget") {
                               id = "com.acme.widget"
                               implementationClass = "com.acme.WidgetPlugin"
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+        @Test
+        void doNotDeclareWithoutADescriptor() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-gradle-plugin'
+                      id 'com.gradle.plugin-publish' version '0.16.0'
+                  }
+
+                  pluginBundle {
+                      website = 'https://example.com'
+                      vcsUrl = 'https://example.com.git'
+
+                      plugins {
+                          widget {
+                              id = 'com.acme.widget'
+                              displayName = 'Widget'
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotDeclareWhenTheDescriptorBelongsToAnotherModule() {
+            rewriteRun(
+              properties(
+                "implementation-class=com.acme.WidgetPlugin\n",
+                spec -> spec.path("widget/src/main/resources/META-INF/gradle-plugins/com.acme.widget.properties")
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-gradle-plugin'
+                      id 'com.gradle.plugin-publish' version '0.16.0'
+                  }
+
+                  pluginBundle {
+                      website = 'https://example.com'
+                      vcsUrl = 'https://example.com.git'
+
+                      plugins {
+                          widget {
+                              id = 'com.acme.widget'
+                              displayName = 'Widget'
                           }
                       }
                   }

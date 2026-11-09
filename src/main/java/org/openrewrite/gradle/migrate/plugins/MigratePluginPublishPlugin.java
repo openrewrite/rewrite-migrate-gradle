@@ -20,11 +20,10 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -36,18 +35,26 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 
+import org.openrewrite.properties.tree.Properties;
+
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class MigratePluginPublishPlugin extends Recipe {
+public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPublishPlugin.Accumulator> {
 
     private static final String PLUGIN_ID = "com.gradle.plugin-publish";
     private static final String NEW_VERSION = "1.3.1";
@@ -66,21 +73,134 @@ public class MigratePluginPublishPlugin extends Recipe {
             "\"Could not find method pluginBundle()\". This recipe does both at once: it moves `website` and `vcsUrl` " +
             "onto `gradlePlugin`, and `description`, `displayName` and `tags` onto each plugin `gradlePlugin { plugins { } }` " +
             "declares, then removes `pluginBundle` and upgrades the plugin to " + NEW_VERSION + ". `tags = [..]` on the " +
-            "declaration needs Gradle 8.2 or later, which `MigrateToGradle8` upgrades to. A script this recipe cannot " +
-            "migrate in full keeps its old plugin version too, rather than being left bumped and broken: that is a " +
-            "`pluginBundle` holding `mavenCoordinates`, a `version` other than the project's, or anything else " +
-            "unrecognized, a declaration in `pluginBundle { plugins { } }` with no counterpart in " +
-            "`gradlePlugin { plugins { } }`, or a missing `gradlePlugin { plugins { } }`. Kotlin scripts are left alone. " +
+            "declaration needs Gradle 8.2 or later, which `MigrateToGradle8` upgrades to. A script with no " +
+            "`gradlePlugin { plugins { } }` of its own, which declares its plugins only in " +
+            "`pluginBundle { plugins { } }`, has that block written for it, taking each `implementationClass` from the " +
+            "checked-in `META-INF/gradle-plugins/<id>.properties` descriptor, which is then deleted: Gradle generates " +
+            "it from the declaration, and a checked-in copy of what it generates makes `processResources` fail on a " +
+            "duplicate entry from Gradle 7 on. A redundant descriptor is deleted for a plugin the script already " +
+            "declares, too. A script this recipe cannot migrate in full keeps its old plugin version, rather than being " +
+            "left bumped and broken: that is a `pluginBundle` holding `mavenCoordinates`, a `version` other than the " +
+            "project's, or anything else unrecognized, a declaration in `pluginBundle { plugins { } }` with no " +
+            "counterpart in `gradlePlugin { plugins { } }`, and a plugin declared in neither block or with no " +
+            "descriptor to take its implementation class from. Kotlin scripts are left alone. " +
             "See the [plugin-publish 1.0 release notes](https://plugins.gradle.org/docs/publish-plugin) for more information.";
 
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+    /**
+     * What the scan of every file found: the checked-in plugin descriptors, and what each build script
+     * would need from them. A descriptor has to be read before a script that needs it can be migrated,
+     * and the order files are visited in says nothing about which comes first, so the two phases are
+     * reconciled in {@link #generate}.
+     */
+    public static class Accumulator {
+        /** Each {@code META-INF/gradle-plugins/<id>.properties}, and the implementation class it names. */
+        final Map<Path, String> descriptors = new HashMap<>();
+        /** Each migratable build script that declares plugin-publish 0.x. */
+        final Map<Path, Request> requests = new HashMap<>();
+        /** The implementation class of each plugin a script has to declare itself, by declaration name. */
+        final Map<Path, Map<String, String>> implementationClasses = new HashMap<>();
+        /** Descriptors Gradle generates once the script declares the plugin, so the checked-in copy goes. */
+        final Set<Path> deletable = new HashSet<>();
+    }
 
+    /** What one build script needs looked up, before any descriptor has been read. */
+    @Value
+    static class Request {
+        /** The script's own directory, so a sibling module's descriptor is not taken for this one. */
+        @Nullable
+        Path dir;
+        /** The id of each plugin the script has to declare itself, by declaration name. */
+        Map<String, String> idsToDeclare;
+        /** The implementation class the script already declares for an id, which makes a descriptor redundant. */
+        Map<String, String> declaredImplementationClasses;
+    }
+
+    @Override
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof G.CompilationUnit)) {
-                    return super.visit(tree, ctx);
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Properties.File) {
+                    Properties.File file = (Properties.File) tree;
+                    String implementationClass = implementationClassOf(file);
+                    if (isPluginDescriptor(file.getSourcePath()) && implementationClass != null) {
+                        acc.descriptors.put(file.getSourcePath(), implementationClass);
+                    }
+                    return tree;
+                }
+                if (!(tree instanceof G.CompilationUnit) || !isGradleScript(((G.CompilationUnit) tree).getSourcePath())) {
+                    return tree;
+                }
+                G.CompilationUnit cu = (G.CompilationUnit) tree;
+                Bundle bundle = findBundle(cu);
+                if (!declaresOldPluginPublish(cu) || bundle == null || !bundle.migratable) {
+                    return tree;
+                }
+                J.MethodInvocation gradlePlugin = findGradlePlugin(cu.getStatements());
+                acc.requests.put(cu.getSourcePath(), gradlePlugin == null ?
+                        new Request(cu.getSourcePath().getParent(), bundle.declaredIds, emptyMap()) :
+                        new Request(cu.getSourcePath().getParent(), emptyMap(), declaredImplementationClasses(gradlePlugin)));
+                return tree;
+            }
+        };
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+        for (Map.Entry<Path, Request> entry : acc.requests.entrySet()) {
+            Request request = entry.getValue();
+
+            // Where the script already declares the plugin, Gradle generates the descriptor from that
+            // declaration, and a checked-in copy of it makes processResources fail on a duplicate entry.
+            for (Map.Entry<String, String> declared : request.declaredImplementationClasses.entrySet()) {
+                Path descriptor = descriptorIn(acc, request.dir, declared.getKey());
+                if (descriptor != null && declared.getValue().equals(acc.descriptors.get(descriptor))) {
+                    acc.deletable.add(descriptor);
+                }
+            }
+
+            if (request.idsToDeclare.isEmpty()) {
+                continue;
+            }
+            Map<String, String> implementationClasses = new LinkedHashMap<>();
+            for (Map.Entry<String, String> toDeclare : request.idsToDeclare.entrySet()) {
+                Path descriptor = descriptorIn(acc, request.dir, toDeclare.getValue());
+                String implementationClass = descriptor == null ? null : acc.descriptors.get(descriptor);
+                if (implementationClass == null) {
+                    // No implementation class to declare, so this script is not migratable after all.
+                    implementationClasses.clear();
+                    break;
+                }
+                implementationClasses.put(toDeclare.getKey(), implementationClass);
+            }
+            if (!implementationClasses.isEmpty()) {
+                acc.implementationClasses.put(entry.getKey(), implementationClasses);
+                for (String id : request.idsToDeclare.values()) {
+                    Path descriptor = descriptorIn(acc, request.dir, id);
+                    if (descriptor != null) {
+                        acc.deletable.add(descriptor);
+                    }
+                }
+            }
+        }
+        return emptyList();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Properties.File) {
+                    return acc.deletable.contains(((Properties.File) tree).getSourcePath()) ? null : tree;
+                }
+                if (!(tree instanceof G.CompilationUnit) || !isGradleScript(((G.CompilationUnit) tree).getSourcePath())) {
+                    return tree;
                 }
                 G.CompilationUnit cu = (G.CompilationUnit) tree;
                 if (!declaresOldPluginPublish(cu)) {
@@ -96,7 +216,10 @@ public class MigratePluginPublishPlugin extends Recipe {
                 Cursor scope = new Cursor(getCursor(), cu);
                 List<Statement> statements = cu.getStatements();
                 if (bundle != null) {
-                    List<Statement> moved = moveBundle(statements, bundle, scope, ctx);
+                    Map<String, String> implementationClasses = acc.implementationClasses.get(cu.getSourcePath());
+                    List<Statement> moved = implementationClasses == null ?
+                            moveBundle(statements, bundle, scope, ctx) :
+                            declareBundle(statements, bundle, implementationClasses, scope);
                     if (moved == null) {
                         return cu;
                     }
@@ -104,7 +227,50 @@ public class MigratePluginPublishPlugin extends Recipe {
                 }
                 return cu.withStatements(ListUtils.map(statements, s -> upgradePluginVersion(s)));
             }
-        });
+        };
+    }
+
+    /* ---------------------------------------------------------------- plugin descriptors */
+
+    private static boolean isGradleScript(Path path) {
+        return path.getFileName().toString().endsWith(".gradle");
+    }
+
+    private static boolean isPluginDescriptor(Path path) {
+        Path parent = path.getParent();
+        return path.getFileName().toString().endsWith(".properties") &&
+               parent != null && parent.toString().replace('\\', '/').endsWith("META-INF/gradle-plugins");
+    }
+
+    private static @Nullable String implementationClassOf(Properties.File file) {
+        for (Properties.Content content : file.getContent()) {
+            if (content instanceof Properties.Entry) {
+                Properties.Entry entry = (Properties.Entry) content;
+                if ("implementation-class".equals(entry.getKey())) {
+                    return entry.getValue().getText().trim();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The descriptor of one plugin id belonging to the module the script is in. Anything below a
+     * directory of its own, such as a subproject, belongs to that subproject's script instead, so only
+     * what is under the module's own {@code src} counts.
+     */
+    private static @Nullable Path descriptorIn(Accumulator acc, @Nullable Path dir, String id) {
+        String name = id + ".properties";
+        for (Path descriptor : acc.descriptors.keySet()) {
+            if (!name.equals(descriptor.getFileName().toString())) {
+                continue;
+            }
+            Path relative = dir == null ? descriptor : (descriptor.startsWith(dir) ? dir.relativize(descriptor) : null);
+            if (relative != null && "src".equals(relative.getName(0).toString())) {
+                return descriptor;
+            }
+        }
+        return null;
     }
 
     /* ---------------------------------------------------------------- plugins { } version */
@@ -192,9 +358,11 @@ public class MigratePluginPublishPlugin extends Recipe {
         Map<String, Expression> forEveryPlugin;
         /** The same, declared for one named plugin. */
         Map<String, Map<String, Expression>> perPlugin;
+        /** The plugin id each declaration names, where it names one as a literal. */
+        Map<String, String> declaredIds;
 
         static Bundle notMigratable() {
-            return new Bundle(false, new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>());
+            return new Bundle(false, new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>());
         }
     }
 
@@ -217,6 +385,7 @@ public class MigratePluginPublishPlugin extends Recipe {
         Map<String, Expression> projectWide = new LinkedHashMap<>();
         Map<String, Expression> everyPlugin = new LinkedHashMap<>();
         Map<String, Map<String, Expression>> perPlugin = new LinkedHashMap<>();
+        Map<String, String> declaredIds = new LinkedHashMap<>();
 
         for (Statement s : blockBody(bundle).getStatements()) {
             J.Assignment assignment = asAssignment(s);
@@ -258,7 +427,12 @@ public class MigratePluginPublishPlugin extends Recipe {
                         return Bundle.notMigratable();
                     }
                     if ("id".equals(name)) {
-                        // gradlePlugin { plugins { } } already declares the id.
+                        // Where gradlePlugin { plugins { } } declares the plugin, it holds the id already.
+                        // Where it does not, this is the only place the id is written down.
+                        String id = stringValue(a.getAssignment());
+                        if (id != null) {
+                            declaredIds.put(named.getSimpleName(), id);
+                        }
                         continue;
                     }
                     if (!PER_PLUGIN.contains(name)) {
@@ -269,7 +443,7 @@ public class MigratePluginPublishPlugin extends Recipe {
                 perPlugin.put(named.getSimpleName(), properties);
             }
         }
-        return new Bundle(true, projectWide, everyPlugin, perPlugin);
+        return new Bundle(true, projectWide, everyPlugin, perPlugin, declaredIds);
     }
 
     /**
@@ -277,14 +451,51 @@ public class MigratePluginPublishPlugin extends Recipe {
      * Returns null when the script has no {@code gradlePlugin { plugins { } }} to move it into, or when
      * {@code pluginBundle} named a plugin that block does not declare.
      */
-    private static @Nullable List<Statement> moveBundle(List<Statement> statements, Bundle bundle, Cursor scope, ExecutionContext ctx) {
-        J.MethodInvocation gradlePlugin = null;
+    private static J.@Nullable MethodInvocation findGradlePlugin(List<Statement> statements) {
+        J.MethodInvocation found = null;
         for (Statement s : statements) {
             J.MethodInvocation block = asBlock(s, "gradlePlugin");
-            if (block != null) {
-                gradlePlugin = block;
+            if (block != null && declaredPluginNames(block) != null) {
+                found = block;
             }
         }
+        return found;
+    }
+
+    /** The implementation class each declared plugin id names, for the ids declared as literals. */
+    private static Map<String, String> declaredImplementationClasses(J.MethodInvocation gradlePlugin) {
+        Map<String, String> byId = new LinkedHashMap<>();
+        for (Statement s : blockBody(gradlePlugin).getStatements()) {
+            J.MethodInvocation plugins = asBlock(s, "plugins");
+            if (plugins == null) {
+                continue;
+            }
+            for (Statement declaration : blockBody(plugins).getStatements()) {
+                J.MethodInvocation named = asAnyBlock(declaration);
+                if (named == null) {
+                    continue;
+                }
+                String id = null;
+                String implementationClass = null;
+                for (Statement property : blockBody(named).getStatements()) {
+                    J.Assignment a = asAssignment(property);
+                    String name = a == null ? null : assignedName(a);
+                    if ("id".equals(name)) {
+                        id = stringValue(a.getAssignment());
+                    } else if ("implementationClass".equals(name)) {
+                        implementationClass = stringValue(a.getAssignment());
+                    }
+                }
+                if (id != null && implementationClass != null) {
+                    byId.put(id, implementationClass);
+                }
+            }
+        }
+        return byId;
+    }
+
+    private static @Nullable List<Statement> moveBundle(List<Statement> statements, Bundle bundle, Cursor scope, ExecutionContext ctx) {
+        J.MethodInvocation gradlePlugin = findGradlePlugin(statements);
         if (gradlePlugin == null) {
             return null;
         }
@@ -304,6 +515,56 @@ public class MigratePluginPublishPlugin extends Recipe {
             J.MethodInvocation withBundle = addToGradlePlugin(block, bundle, scope, ctx);
             return s instanceof J.Return ? ((J.Return) s).withExpression(withBundle) : withBundle;
         });
+    }
+
+    /**
+     * Replaces the {@code pluginBundle { }} block with the {@code gradlePlugin { }} block 1.x reads, for a
+     * script that declares its plugins nowhere else. Each implementation class comes from the checked-in
+     * {@code META-INF/gradle-plugins} descriptor, which goes, since Gradle generates it from the
+     * declaration. Returns null when a declaration names no plugin id, so there is nothing to look up.
+     */
+    private static @Nullable List<Statement> declareBundle(List<Statement> statements, Bundle bundle,
+                                                           Map<String, String> implementationClasses, Cursor scope) {
+        if (bundle.perPlugin.isEmpty() ||
+            !bundle.declaredIds.keySet().containsAll(bundle.perPlugin.keySet()) ||
+            !implementationClasses.keySet().containsAll(bundle.perPlugin.keySet())) {
+            return null;
+        }
+
+        StringBuilder snippet = new StringBuilder("gradlePlugin {\n");
+        List<Object> values = new ArrayList<>();
+        for (Map.Entry<String, Expression> property : bundle.projectWide.entrySet()) {
+            snippet.append("    ").append(property.getKey()).append(" = #{any()}\n");
+            values.add(property.getValue().withPrefix(Space.EMPTY));
+        }
+        snippet.append("    plugins {\n");
+        for (Map.Entry<String, Map<String, Expression>> declaration : bundle.perPlugin.entrySet()) {
+            String name = declaration.getKey();
+            snippet.append("        ").append(name).append(" {\n");
+            snippet.append("            id = ").append(quote(bundle.declaredIds.get(name))).append('\n');
+            snippet.append("            implementationClass = ").append(quote(implementationClasses.get(name))).append('\n');
+            Map<String, Expression> properties = new LinkedHashMap<>(bundle.forEveryPlugin);
+            properties.putAll(declaration.getValue());
+            for (Map.Entry<String, Expression> property : properties.entrySet()) {
+                snippet.append("            ").append(property.getKey()).append(" = #{any()}\n");
+                values.add(property.getValue().withPrefix(Space.EMPTY));
+            }
+            snippet.append("        }\n");
+        }
+        snippet.append("    }\n}");
+
+        GroovyTemplate template = GroovyTemplate.builder(snippet.toString()).build();
+        return ListUtils.map(statements, s -> {
+            if (asBlock(s, "pluginBundle") == null) {
+                return s;
+            }
+            return (Statement) template.apply(new Cursor(scope, s), s.getCoordinates().replace(), values.toArray());
+        });
+    }
+
+    /** A Groovy single-quoted string, for the two values that come from a properties file. */
+    private static String quote(String value) {
+        return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'";
     }
 
     private static @Nullable List<String> declaredPluginNames(J.MethodInvocation gradlePlugin) {
