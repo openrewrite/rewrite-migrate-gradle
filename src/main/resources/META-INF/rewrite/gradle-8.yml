@@ -32,6 +32,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.artifacts.UseGetOnConfigurationAccessors
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup
   - org.openrewrite.gradle.migrate.jacoco.JacocoReportDeprecations
+  # Already a compile error in Kotlin on 8.x, deprecated in Groovy since 8.2 and removed in 9.0
+  - org.openrewrite.gradle.migrate.application.UseApplicationBlockForConventionProperties
   # Gradle 8.0 removed these, except TestReport.destinationDir which Gradle 9 removes; all replacements work on Gradle 8
   - org.openrewrite.gradle.migrate.tasks.MigrateTaskOutputProperties
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#v7_java_exec_api_cleanup
