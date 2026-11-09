@@ -29,7 +29,7 @@ recipeList:
   # Legacy Shadow versions use APIs removed in Gradle 9
   - org.openrewrite.gradle.migrate.plugins.UpgradeShadowPlugin
   # Map notation has been deprecated in 9.1+
-  - org.openrewrite.gradle.DependencyUseStringNotation
+  - org.openrewrite.gradle.migrate.artifacts.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
   # kotlinOptions does not compile with the kotlin-dsl plugin 6.7.6 that Gradle 9.8 uses
   - org.openrewrite.gradle.migrate.kotlin.UseCompilerOptionsWithKotlinDsl
