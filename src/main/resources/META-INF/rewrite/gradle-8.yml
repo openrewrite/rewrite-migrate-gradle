@@ -81,3 +81,5 @@ recipeList:
       propertyName: archiveExtension
   - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
       propertyName: archiveFileName
+  # Not `propertyName: url`: a `url` in a pom.withXml builder closure adds an XML node, and fails as an assignment
+  - org.openrewrite.gradle.migrate.artifacts.UseAssignmentForRepositoryUrl
