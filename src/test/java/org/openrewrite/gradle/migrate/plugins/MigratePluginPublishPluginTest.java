@@ -139,6 +139,162 @@ class MigratePluginPublishPluginTest implements RewriteTest {
     }
 
     @Test
+    void theBundleValuesWinOverTheDeclarationsOwn() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '0.12.0'
+              }
+
+              pluginBundle {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  displayName = 'The thing'
+                  description = 'What the portal shows today'
+                  tags = ['thing']
+              }
+
+              gradlePlugin {
+                  plugins {
+                      first {
+                          id = 'com.acme.first'
+                          implementationClass = 'com.acme.First'
+                          displayName = 'first'
+                          description = 'What the portal has never shown'
+                          tags = ['stale']
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '1.3.1'
+              }
+
+              gradlePlugin {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  plugins {
+                      first {
+                          id = 'com.acme.first'
+                          implementationClass = 'com.acme.First'
+                          displayName = 'The thing'
+                          description = 'What the portal shows today'
+                          tags = ['thing']
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void aPerPluginValueWinsOverTheBundleWideOneAndTheDeclarationsOwn() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '0.12.0'
+              }
+
+              pluginBundle {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  description = 'Does a thing'
+                  tags = ['thing']
+                  plugins {
+                      first {
+                          displayName = 'First'
+                          description = 'Does the first thing'
+                      }
+                  }
+              }
+
+              gradlePlugin {
+                  plugins {
+                      first {
+                          id = 'com.acme.first'
+                          implementationClass = 'com.acme.First'
+                          description = 'Something else again'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '1.3.1'
+              }
+
+              gradlePlugin {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  plugins {
+                      first {
+                          id = 'com.acme.first'
+                          implementationClass = 'com.acme.First'
+                          description = 'Does the first thing'
+                          tags = ['thing']
+                          displayName = 'First'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepWhatTheDeclarationHoldsAndTheBundleDoesNotName() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '0.12.0'
+              }
+
+              pluginBundle {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  tags = ['thing']
+              }
+
+              gradlePlugin {
+                  plugins {
+                      first {
+                          id = 'com.acme.first'
+                          implementationClass = 'com.acme.First'
+                          displayName = 'First'
+                          description = 'Does a thing'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '1.3.1'
+              }
+
+              gradlePlugin {
+                  website = 'https://example.com'
+                  vcsUrl = 'https://example.com.git'
+                  plugins {
+                      first {
+                          id = 'com.acme.first'
+                          implementationClass = 'com.acme.First'
+                          displayName = 'First'
+                          description = 'Does a thing'
+                          tags = ['thing']
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void mergeNestedPluginDeclarations() {
         rewriteRun(
           buildGradle(

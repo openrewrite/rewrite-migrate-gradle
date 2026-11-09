@@ -616,17 +616,46 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
                 if (own != null) {
                     wanted.putAll(own);
                 }
-                Map<String, Expression> missing = missingFrom(blockBody(named).getStatements(), wanted);
-                if (missing.isEmpty()) {
+                J.MethodInvocation held = overwriteAssignments(named, wanted, pluginsCursor);
+                Map<String, Expression> missing = missingFrom(blockBody(held).getStatements(), wanted);
+                J.MethodInvocation filled = missing.isEmpty() ? held : addAssignments(held, missing, pluginsCursor, false);
+                if (filled == named) {
                     return declaration;
                 }
-                J.MethodInvocation filled = addAssignments(named, missing, pluginsCursor, false);
                 return declaration instanceof J.Return ? ((J.Return) declaration).withExpression(filled) : filled;
             });
             J.MethodInvocation replaced = withBody(plugins, pluginsBody.withStatements(declarations));
             return s instanceof J.Return ? ((J.Return) s).withExpression(replaced) : replaced;
         });
         return withBody(result, blockBody(result).withStatements(withPlugins));
+    }
+
+    /**
+     * Gives each value the bundle names to the declaration that already assigns it.
+     * In 0.x the portal took displayName, description and tags from {@code pluginBundle} and only the
+     * id from the {@code gradlePlugin} declaration, so where the two name the same property it is the
+     * bundle's value that was published, and the one to keep. A declaration that was written for 1.x
+     * ahead of this migration, and a stale {@code pluginBundle} beside it, are the one case where that
+     * loses the newer value, and the published description is the stale one either way.
+     */
+    private static J.MethodInvocation overwriteAssignments(J.MethodInvocation block,
+                                                           Map<String, Expression> wanted, Cursor scope) {
+        J.Block body = blockBody(block);
+        List<Statement> statements = ListUtils.map(body.getStatements(), s -> {
+            J.Assignment existing = asAssignment(s);
+            String name = existing == null ? null : assignedName(existing);
+            Expression value = name == null ? null : wanted.get(name);
+            if (value == null) {
+                return s;
+            }
+            Expression was = existing.getAssignment();
+            if (was.printTrimmed(scope).equals(value.printTrimmed(scope))) {
+                return s;
+            }
+            J.Assignment replaced = existing.withAssignment(value.withPrefix(was.getPrefix()));
+            return s instanceof J.Return ? ((J.Return) s).withExpression(replaced) : (Statement) replaced;
+        });
+        return statements == body.getStatements() ? block : withBody(block, body.withStatements(statements));
     }
 
     private static Map<String, Expression> missingFrom(List<Statement> statements, Map<String, Expression> wanted) {
