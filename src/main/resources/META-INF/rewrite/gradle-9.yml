@@ -24,14 +24,22 @@ recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 9.x
       addIfMissing: false
+  # jcenter() was removed in 9.0; JCenter has redirected to Maven Central since August 2024
+  - org.openrewrite.gradle.migrate.artifacts.UseMavenCentralInsteadOfJcenter
+  # Legacy Shadow versions use APIs removed in Gradle 9
+  - org.openrewrite.gradle.migrate.plugins.UpgradeShadowPlugin
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
-  - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
-  - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
   - org.openrewrite.gradle.migrate.java.UseJavaExtensionBlock
+  # BasePluginConvention was removed in Gradle 9; archivesBaseName, libsDirName and distsDirName no longer work
+  - org.openrewrite.gradle.migrate.base.UseBaseExtensionBlock
   - org.openrewrite.gradle.migrate.artifacts.RewriteSpreadAllInConfigurationsBlock
+  # Manifest.attributes is read-only in Gradle 9; use the merging method instead of +=
+  - org.openrewrite.gradle.migrate.tasks.UseManifestAttributes
+  # ProjectDependency no longer delegates Project properties in Gradle 9
+  - org.openrewrite.gradle.migrate.artifacts.UseProjectForSourceSets
   # version = { } is invalid Gradle DSL; the closure form version { } must be used
   - org.openrewrite.gradle.migrate.artifacts.UseVersionClosure
   # Depending on the current project by its own module coordinates is deprecated in 9.3
@@ -59,3 +67,7 @@ recipeList:
   # Project.container(Class) only warns until Gradle 10, and ObjectFactory rejects element classes it accepts, such as a final
   # class in another file, which the recipe cannot see. Run it on its own and check the build.
   # - org.openrewrite.gradle.migrate.model.UseObjectFactoryDomainObjectContainer
+  # Configuration.visible has no effect since 9.0 and is deprecated, for removal in 11
+  - org.openrewrite.gradle.migrate.artifacts.RemoveConfigurationVisible
+  # Implicit parallel model building through org.gradle.parallel is deprecated in 9.8 and an error in 10
+  - org.openrewrite.gradle.migrate.properties.AddToolingParallelProperty
