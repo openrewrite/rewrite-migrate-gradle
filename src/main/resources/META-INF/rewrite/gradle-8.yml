@@ -24,6 +24,8 @@ recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 8.x
       addIfMissing: false
+  # Gradle 8.0 removed Substitution.with(ComponentSelector) in favor of using; with still works on 7.6
+  - org.openrewrite.gradle.migrate.artifacts.UseUsingForDependencySubstitution
   # Gradle 8.0 removed the Configuration extensions on NamedDomainObjectProvider<Configuration> from the Kotlin DSL
   - org.openrewrite.gradle.migrate.artifacts.UseGetOnConfigurationAccessors
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup
