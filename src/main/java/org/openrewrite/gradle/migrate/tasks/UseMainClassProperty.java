@@ -17,15 +17,21 @@ package org.openrewrite.gradle.migrate.tasks;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
+
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -35,17 +41,23 @@ public class UseMainClassProperty extends Recipe {
 
     String displayName = "Use `mainClass` instead of `main` for `JavaExec` tasks";
 
-    String description = "The `main` property on `JavaExec` tasks was deprecated in Gradle 7.1 and removed in Gradle 9.0. " +
+    String description = "The `main` property on `JavaExec` tasks was deprecated in Gradle 7.1. Kotlin scripts stop compiling on it in Gradle 8.0 and Groovy scripts fail on it in Gradle 9.0. " +
             "Use the `mainClass` property instead. " +
-            "See the [Gradle upgrade guide](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.";
+            "See the [Gradle upgrade guide](https://docs.gradle.org/8.14/userguide/upgrading_version_7.html#v7_java_exec_api_cleanup) for more information.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (hasJavaExecType(method)) {
+                if (hasJavaExecType(method) || isRunTask(method)) {
                     getCursor().putMessage(IN_JAVA_EXEC, true);
+                } else if (isMainCall(method) && getCursor().getNearestMessage(IN_JAVA_EXEC) != null) {
+                    // `main 'com.Foo'` is the method Gradle generates for the property, and goes the same way.
+                    // The class travels as a parameter rather than as text, so a `#{` inside it cannot be mistaken
+                    // for a placeholder
+                    return GroovyTemplate.builder("mainClass = #{any()}").build()
+                            .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0).withPrefix(Space.EMPTY));
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
@@ -67,6 +79,33 @@ public class UseMainClassProperty extends Recipe {
                     }
                 }
                 return assignment;
+            }
+
+            private boolean isMainCall(J.MethodInvocation method) {
+                return "main".equals(method.getSimpleName()) && method.getSelect() == null &&
+                       method.getArguments().size() == 1 && !(method.getArguments().get(0) instanceof J.Lambda) &&
+                       !(method.getArguments().get(0) instanceof J.Empty) &&
+                       getCursor().firstEnclosing(JavaSourceFile.class) instanceof G.CompilationUnit;
+            }
+
+            /**
+             * The application plugin's `run` task is a `JavaExec`, configured without naming its type. Groovy only:
+             * in Kotlin a bare `run { }` is the standard library's scope function.
+             */
+            private boolean isRunTask(J.MethodInvocation method) {
+                if (!(getCursor().firstEnclosing(JavaSourceFile.class) instanceof G.CompilationUnit)) {
+                    return false;
+                }
+                List<Expression> arguments = method.getArguments();
+                if ("run".equals(method.getSimpleName()) && arguments.size() == 1 && arguments.get(0) instanceof J.Lambda) {
+                    return method.getSelect() == null || isTasks(method.getSelect());
+                }
+                return "named".equals(method.getSimpleName()) && isTasks(method.getSelect()) && !arguments.isEmpty() &&
+                       arguments.get(0) instanceof J.Literal && "run".equals(((J.Literal) arguments.get(0)).getValue());
+            }
+
+            private boolean isTasks(@Nullable Expression select) {
+                return select instanceof J.Identifier && "tasks".equals(((J.Identifier) select).getSimpleName());
             }
 
             private boolean hasJavaExecType(J.MethodInvocation method) {
