@@ -24,6 +24,8 @@ recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 8.x
       addIfMissing: false
+  # Gradle 8.0 no longer allows a Configuration as a dependency; 6.9 and 7.6 show that it amounted to extendsFrom
+  - org.openrewrite.gradle.migrate.artifacts.UseExtendsFromForConfigurationDependencies
   # Gradle 8.0 removed Substitution.with(ComponentSelector) in favor of using; with still works on 7.6
   - org.openrewrite.gradle.migrate.artifacts.UseUsingForDependencySubstitution
   # Gradle 8.0 removed the Configuration extensions on NamedDomainObjectProvider<Configuration> from the Kotlin DSL
