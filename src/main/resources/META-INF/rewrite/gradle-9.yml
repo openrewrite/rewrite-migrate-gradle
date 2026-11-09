@@ -24,6 +24,8 @@ recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 9.x
       addIfMissing: false
+  # Legacy Shadow versions use APIs removed in Gradle 9
+  - org.openrewrite.gradle.migrate.plugins.UpgradeShadowPlugin
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
@@ -32,6 +34,10 @@ recipeList:
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
   - org.openrewrite.gradle.migrate.java.UseJavaExtensionBlock
   - org.openrewrite.gradle.migrate.artifacts.RewriteSpreadAllInConfigurationsBlock
+  # Manifest.attributes is read-only in Gradle 9; use the merging method instead of +=
+  - org.openrewrite.gradle.migrate.tasks.UseManifestAttributes
+  # ProjectDependency no longer delegates Project properties in Gradle 9
+  - org.openrewrite.gradle.migrate.artifacts.UseProjectForSourceSets
   # version = { } is invalid Gradle DSL; the closure form version { } must be used
   - org.openrewrite.gradle.migrate.artifacts.UseVersionClosure
   # Depending on the current project by its own module coordinates is deprecated in 9.3
