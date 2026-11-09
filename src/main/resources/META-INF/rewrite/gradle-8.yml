@@ -26,6 +26,10 @@ recipeList:
       addIfMissing: false
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup
   - org.openrewrite.gradle.migrate.jacoco.JacocoReportDeprecations
+  # https://docs.gradle.org/current/userguide/upgrading_version_7.html#v7_java_exec_api_cleanup
+  - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
+  # https://docs.gradle.org/current/userguide/upgrading_version_7.html#v7_java_application_api_cleanup
+  - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
   - org.openrewrite.gradle.migrate.tasks.MigrateArchiveClassifier
   # https://docs.gradle.org/8.11.1/userguide/upgrading_version_8.html#test_framework_implementation_dependencies
   - org.openrewrite.gradle.AddJUnitPlatformLauncher
