@@ -64,5 +64,7 @@ recipeList:
   - org.openrewrite.gradle.migrate.kotlindsl.UseContainerMethodsInsteadOfDelegates
   # The org.gradle.unsafe.isolated-projects* properties are deprecated in 9.7
   - org.openrewrite.gradle.migrate.properties.MigrateIsolatedProjectsProperties
+  # Configuration.visible has no effect since 9.0 and is deprecated, for removal in 11
+  - org.openrewrite.gradle.migrate.artifacts.RemoveConfigurationVisible
   # Implicit parallel model building through org.gradle.parallel is deprecated in 9.8 and an error in 10
   - org.openrewrite.gradle.migrate.properties.AddToolingParallelProperty
