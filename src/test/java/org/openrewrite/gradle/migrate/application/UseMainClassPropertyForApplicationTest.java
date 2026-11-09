@@ -84,6 +84,56 @@ class UseMainClassPropertyForApplicationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void methodCallFormInApplicationBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'application'
+              }
+
+              application {
+                  mainClassName 'com.example.AppMain'
+              }
+              """,
+            """
+              plugins {
+                  id 'application'
+              }
+
+              application {
+                  mainClass = 'com.example.AppMain'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void topLevelMethodCallForm() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'application'
+              }
+
+              mainClassName 'com.example.AppMain'
+              """,
+            """
+              plugins {
+                  id 'application'
+              }
+
+              application {
+                  mainClass = 'com.example.AppMain'
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class NoChange {
         @Test
