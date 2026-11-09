@@ -26,6 +26,8 @@ recipeList:
       addIfMissing: false
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup
   - org.openrewrite.gradle.migrate.jacoco.JacocoReportDeprecations
+  # Gradle 8.0 removed these, except TestReport.destinationDir which Gradle 9 removes; all replacements work on Gradle 8
+  - org.openrewrite.gradle.migrate.tasks.MigrateTaskOutputProperties
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#v7_java_exec_api_cleanup
   - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#v7_java_application_api_cleanup
