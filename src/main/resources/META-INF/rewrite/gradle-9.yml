@@ -31,6 +31,9 @@ recipeList:
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.migrate.artifacts.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
+  # Gradle 9 compiles Groovy with Groovy 4, which a Spock built for an earlier Groovy refuses to run on.
+  # After DependencyUseStringNotation, so that a map notation declaration has become a string one.
+  - org.openrewrite.gradle.migrate.artifacts.UseGroovy4CompatibleSpock
   # kotlinOptions does not compile with the kotlin-dsl plugin 6.7.6 that Gradle 9.8 uses
   - org.openrewrite.gradle.migrate.kotlin.UseCompilerOptionsWithKotlinDsl
   # The Kotlin 2 compiler in 9.0 no longer resolves script labels such as this@Build_gradle
