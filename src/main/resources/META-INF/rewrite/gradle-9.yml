@@ -29,14 +29,35 @@ recipeList:
   # Legacy Shadow versions use APIs removed in Gradle 9
   - org.openrewrite.gradle.migrate.plugins.UpgradeShadowPlugin
   # Map notation has been deprecated in 9.1+
-  - org.openrewrite.gradle.DependencyUseStringNotation
+  - org.openrewrite.gradle.migrate.artifacts.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
   # Gradle 9 brings Groovy 4, which conflicts with a Groovy 2 or 3 the plugin project declares itself
   - org.openrewrite.gradle.migrate.artifacts.UseLocalGroovy
+  # Gradle 9 compiles Groovy with Groovy 4, which a Spock built for an earlier Groovy refuses to run on.
+  # After DependencyUseStringNotation, so that a map notation declaration has become a string one.
+  - org.openrewrite.gradle.migrate.artifacts.UseGroovy4CompatibleSpock
+  # kotlinOptions does not compile with the kotlin-dsl plugin 6.7.6 that Gradle 9.8 uses
+  - org.openrewrite.gradle.migrate.kotlin.UseCompilerOptionsWithKotlinDsl
+  # The Kotlin 2 compiler in 9.0 no longer resolves script labels such as this@Build_gradle
+  - org.openrewrite.gradle.migrate.kotlin.UseProjectInsteadOfBuildScriptLabel
+  # IdeaModule.testSourceDirs and testResourceDirs are removed in 9.0
+  - org.openrewrite.gradle.migrate.idea.UseIdeaModuleTestSources
+  # AbstractOptions.define(Map), CompileOptions.fork(Map) and debug(Map) are removed in 9.0
+  - org.openrewrite.gradle.migrate.java.UseCompileOptionsProperties
+  # The Kotlin DSL's "name"() lookup does not compile on 9.0
+  - org.openrewrite.gradle.migrate.tasks.UseNamedInsteadOfStringInvoke
+  # WriteProperties.outputFile is removed in 9.0
+  - org.openrewrite.gradle.migrate.tasks.UseWritePropertiesDestinationFile
+  # JvmVendorSpec.IBM_SEMERU is removed in 9.0; on 8.14 it is the same vendor as IBM
+  - org.openrewrite.gradle.migrate.java.UseJvmVendorSpecIbm
+  # CopyProcessingSpec.fileMode and dirMode are removed in 9.0
+  - org.openrewrite.gradle.migrate.tasks.UseFilePermissions
   - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
   - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
   - org.openrewrite.gradle.migrate.java.UseJavaExtensionBlock
+  # BasePluginConvention was removed in Gradle 9; archivesBaseName, libsDirName and distsDirName no longer work
+  - org.openrewrite.gradle.migrate.base.UseBaseExtensionBlock
   - org.openrewrite.gradle.migrate.artifacts.RewriteSpreadAllInConfigurationsBlock
   # Manifest.attributes is read-only in Gradle 9; use the merging method instead of +=
   - org.openrewrite.gradle.migrate.tasks.UseManifestAttributes
@@ -56,6 +77,10 @@ recipeList:
   - org.openrewrite.gradle.plugins.UpgradePluginVersion:
       pluginIdPattern: io.spring.dependency-management
       newVersion: 1.1.7
+  # Adding artifacts to the archives configuration is deprecated in 9.1 and fails in 10
+  - org.openrewrite.gradle.migrate.artifacts.UseAssembleDependsOnInsteadOfArchives
+  # Using a Project object as a dependency notation is deprecated in 9.6 and fails in 10
+  - org.openrewrite.gradle.migrate.artifacts.UseProjectPathForDependencyNotation
   # PMD's targetJdk is deprecated in 9.6 and has no replacement
   - org.openrewrite.gradle.migrate.quality.RemovePmdTargetJdk
   # CreateStartScripts.exitEnvironmentVar became a no-op and is deprecated in 9.6
@@ -66,3 +91,12 @@ recipeList:
   - org.openrewrite.gradle.migrate.kotlindsl.UseContainerMethodsInsteadOfDelegates
   # The org.gradle.unsafe.isolated-projects* properties are deprecated in 9.7
   - org.openrewrite.gradle.migrate.properties.MigrateIsolatedProjectsProperties
+  # Provider.forUseAtConfigurationTime() is gone in Gradle 9; it was already a no-op from 7.4
+  - org.openrewrite.gradle.migrate.providers.RemoveForUseAtConfigurationTime
+  # Project.container(Class) only warns until Gradle 10, and ObjectFactory rejects element classes it accepts, such as a final
+  # class in another file, which the recipe cannot see. Run it on its own and check the build.
+  # - org.openrewrite.gradle.migrate.model.UseObjectFactoryDomainObjectContainer
+  # Configuration.visible has no effect since 9.0 and is deprecated, for removal in 11
+  - org.openrewrite.gradle.migrate.artifacts.RemoveConfigurationVisible
+  # Implicit parallel model building through org.gradle.parallel is deprecated in 9.8 and an error in 10
+  - org.openrewrite.gradle.migrate.properties.AddToolingParallelProperty
