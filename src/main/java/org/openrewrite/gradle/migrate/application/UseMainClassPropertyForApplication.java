@@ -20,11 +20,13 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyTemplate;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
@@ -39,9 +41,9 @@ public class UseMainClassPropertyForApplication extends Recipe {
 
     String displayName = "Use `application { mainClass }` instead of `mainClassName`";
 
-    String description = "The `mainClassName` property on the `application` extension was deprecated in Gradle 6.4 and removed in Gradle 9.0. " +
+    String description = "The `mainClassName` property on the `application` extension was deprecated in Gradle 6.4. Kotlin scripts stop compiling on it in Gradle 8.0 and Groovy scripts fail on it in Gradle 9.0. " +
             "Use `application { mainClass = ... }` instead. Top-level `mainClassName` assignments are wrapped in an `application` block. " +
-            "See the [Gradle upgrade guide](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.";
+            "See the [Gradle upgrade guide](https://docs.gradle.org/8.14/userguide/upgrading_version_7.html#v7_java_application_api_cleanup) for more information.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -50,6 +52,16 @@ public class UseMainClassPropertyForApplication extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if ("application".equals(method.getSimpleName())) {
                     getCursor().putMessage(IN_APPLICATION, true);
+                } else if (isMainClassNameCall(method)) {
+                    // `mainClassName 'com.Foo'` is the method Gradle generates for the property, and goes the same way
+                    Expression mainClass = method.getArguments().get(0).withPrefix(Space.EMPTY);
+                    if (getCursor().getNearestMessage(IN_APPLICATION) != null) {
+                        return GroovyTemplate.builder("mainClass = #{any()}").build()
+                                .apply(getCursor(), method.getCoordinates().replace(), mainClass);
+                    }
+                    if (getCursor().firstEnclosing(J.Lambda.class) == null && mainClass instanceof J.Literal) {
+                        return applicationBlock(method, mainClass);
+                    }
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
@@ -100,6 +112,13 @@ public class UseMainClassPropertyForApplication extends Recipe {
                     return super.visitVariableDeclarations(multiVariable, ctx);
                 }
                 return applicationBlock(multiVariable, initializer);
+            }
+
+            private boolean isMainClassNameCall(J.MethodInvocation method) {
+                return "mainClassName".equals(method.getSimpleName()) && method.getSelect() == null &&
+                       method.getArguments().size() == 1 && !(method.getArguments().get(0) instanceof J.Empty) &&
+                       !(method.getArguments().get(0) instanceof J.Lambda) &&
+                       getCursor().firstEnclosing(JavaSourceFile.class) instanceof G.CompilationUnit;
             }
 
             // The main class travels as a parameter rather than as text, so a `#{` inside the literal cannot be
