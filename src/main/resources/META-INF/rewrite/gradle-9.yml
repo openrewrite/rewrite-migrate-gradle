@@ -31,6 +31,8 @@ recipeList:
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.migrate.artifacts.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
+  # Gradle 9 brings Groovy 4, which conflicts with a Groovy 2 or 3 the plugin project declares itself
+  - org.openrewrite.gradle.migrate.artifacts.UseLocalGroovy
   # Gradle 9 compiles Groovy with Groovy 4, which a Spock built for an earlier Groovy refuses to run on.
   # After DependencyUseStringNotation, so that a map notation declaration has become a string one.
   - org.openrewrite.gradle.migrate.artifacts.UseGroovy4CompatibleSpock
