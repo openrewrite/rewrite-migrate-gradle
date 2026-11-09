@@ -461,6 +461,515 @@ class JacocoReportDeprecationsTest implements RewriteTest {
     }
 
     @Nested
+    class OtherReportingTasks {
+        @Test
+        void testTaskInGroovy() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                  }
+
+                  test {
+                      reports.html.enabled = false
+                      reports.junitXml.destination = file("out")
+                      reports {
+                          junitXml.enabled false
+                          html {
+                              enabled = true
+                              destination file("html")
+                          }
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                  }
+
+                  test {
+                      reports.html.required = false
+                      reports.junitXml.outputLocation = file("out")
+                      reports {
+                          junitXml.required = false
+                          html {
+                              required = true
+                              outputLocation = file("html")
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void taskContainerOwnersInGroovy() {
+            rewriteRun(
+              buildGradle(
+                """
+                  task integrationTest(type: Test) {
+                      reports.html.enabled = false
+                  }
+                  integrationTest {
+                      reports.xml.enabled = false
+                  }
+                  tasks.withType(Test) {
+                      reports.html.enabled = false
+                  }
+                  tasks.withType(Test).configureEach {
+                      reports.html.enabled = false
+                  }
+                  tasks.named('test') {
+                      reports.html.enabled = false
+                  }
+                  tasks.named('jacocoTestReport', JacocoReport) {
+                      reports.html.enabled = false
+                  }
+                  tasks.register('t', Test) {
+                      reports.html.enabled = false
+                  }
+                  test.reports.html.enabled = false
+                  tasks.test.reports.html.destination = file('x')
+                  subprojects {
+                      tasks.withType(Test) {
+                          reports {
+                              html.enabled = false
+                          }
+                      }
+                  }
+                  """,
+                """
+                  task integrationTest(type: Test) {
+                      reports.html.required = false
+                  }
+                  integrationTest {
+                      reports.xml.required = false
+                  }
+                  tasks.withType(Test) {
+                      reports.html.required = false
+                  }
+                  tasks.withType(Test).configureEach {
+                      reports.html.required = false
+                  }
+                  tasks.named('test') {
+                      reports.html.required = false
+                  }
+                  tasks.named('jacocoTestReport', JacocoReport) {
+                      reports.html.required = false
+                  }
+                  tasks.register('t', Test) {
+                      reports.html.required = false
+                  }
+                  test.reports.html.required = false
+                  tasks.test.reports.html.outputLocation = file('x')
+                  subprojects {
+                      tasks.withType(Test) {
+                          reports {
+                              html.required = false
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void qualityPluginsInGroovy() {
+            rewriteRun(
+              buildGradle(
+                """
+                  checkstyleMain {
+                      reports {
+                          xml.enabled = false
+                          html.destination = file('c.html')
+                      }
+                  }
+                  pmdTest {
+                      reports.html.enabled = true
+                  }
+                  codenarcMain {
+                      reports {
+                          text.enabled = true
+                      }
+                  }
+                  spotbugsMain {
+                      reports {
+                          html {
+                              enabled = true
+                              destination = file('s.html')
+                          }
+                          sarif.enabled = false
+                      }
+                  }
+                  tasks.withType(Checkstyle) {
+                      reports {
+                          sarif.enabled = true
+                      }
+                  }
+                  tasks.withType(Pmd) {
+                      reports.xml.enabled = false
+                  }
+                  tasks.withType(CodeNarc) {
+                      reports.console.enabled = false
+                  }
+                  tasks.withType(com.github.spotbugs.snom.SpotBugsTask) {
+                      reports.xml.enabled = false
+                  }
+                  """,
+                """
+                  checkstyleMain {
+                      reports {
+                          xml.required = false
+                          html.outputLocation = file('c.html')
+                      }
+                  }
+                  pmdTest {
+                      reports.html.required = true
+                  }
+                  codenarcMain {
+                      reports {
+                          text.required = true
+                      }
+                  }
+                  spotbugsMain {
+                      reports {
+                          html {
+                              required = true
+                              outputLocation = file('s.html')
+                          }
+                          sarif.required = false
+                      }
+                  }
+                  tasks.withType(Checkstyle) {
+                      reports {
+                          sarif.required = true
+                      }
+                  }
+                  tasks.withType(Pmd) {
+                      reports.xml.required = false
+                  }
+                  tasks.withType(CodeNarc) {
+                      reports.console.required = false
+                  }
+                  tasks.withType(com.github.spotbugs.snom.SpotBugsTask) {
+                      reports.xml.required = false
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void everyReport() {
+            rewriteRun(
+              buildGradle(
+                """
+                  checkstyleMain {
+                      reports.all {
+                          enabled = false
+                      }
+                      reports.all { report ->
+                          report.enabled = true
+                      }
+                      reports.each {
+                          it.enabled = true
+                      }
+                      reports {
+                          all {
+                              enabled = false
+                          }
+                      }
+                  }
+                  """,
+                """
+                  checkstyleMain {
+                      reports.all {
+                          required = false
+                      }
+                      reports.all { report ->
+                          report.required = true
+                      }
+                      reports.each {
+                          it.required = true
+                      }
+                      reports {
+                          all {
+                              required = false
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void closuresOnReportsContainer() {
+            rewriteRun(
+              buildGradle(
+                """
+                  test {
+                      reports.html {
+                          enabled = false
+                          destination = file('h')
+                      }
+                  }
+                  spotbugsMain {
+                      reports.create("html") {
+                          enabled = true
+                      }
+                  }
+                  """,
+                """
+                  test {
+                      reports.html {
+                          required = false
+                          outputLocation = file('h')
+                      }
+                  }
+                  spotbugsMain {
+                      reports.create("html") {
+                          required = true
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void kotlinTaskOwners() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  plugins {
+                      java
+                      checkstyle
+                  }
+
+                  tasks.test {
+                      reports.html.isEnabled = false
+                      reports {
+                          junitXml.isEnabled = true
+                          html.setDestination(file("o"))
+                      }
+                  }
+                  tasks.withType<Test> {
+                      reports.html.isEnabled = false
+                  }
+                  tasks.withType<Checkstyle>().configureEach {
+                      reports {
+                          xml.isEnabled = false
+                          html.destination = file("o")
+                      }
+                  }
+                  tasks.named<Test>("test") {
+                      reports.junitXml.isEnabled = false
+                  }
+                  tasks.register<Test>("it") {
+                      reports.html.isEnabled = false
+                  }
+                  tasks {
+                      test {
+                          reports.html.isEnabled = false
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      java
+                      checkstyle
+                  }
+
+                  tasks.test {
+                      reports.html.required = false
+                      reports {
+                          junitXml.required = true
+                          html.outputLocation = file("o")
+                      }
+                  }
+                  tasks.withType<Test> {
+                      reports.html.required = false
+                  }
+                  tasks.withType<Checkstyle>().configureEach {
+                      reports {
+                          xml.required = false
+                          html.outputLocation = file("o")
+                      }
+                  }
+                  tasks.named<Test>("test") {
+                      reports.junitXml.required = false
+                  }
+                  tasks.register<Test>("it") {
+                      reports.html.required = false
+                  }
+                  tasks {
+                      test {
+                          reports.html.required = false
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void stringDestinationIsWrappedInFile() {
+            rewriteRun(
+              buildGradle(
+                """
+                  test {
+                      reports.html.destination = "$buildDir/out"
+                      reports {
+                          junitXml.destination 'junit'
+                      }
+                  }
+                  """,
+                """
+                  test {
+                      reports.html.outputLocation = file("$buildDir/out")
+                      reports {
+                          junitXml.outputLocation = file('junit')
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotChangeEnabledOutsideOfReports() {
+            rewriteRun(
+              buildGradle(
+                """
+                  test {
+                      enabled = false
+                      html.enabled = false
+                  }
+                  jacocoTestReport.enabled = false
+                  def task = tasks.getByName('test')
+                  task.enabled = false
+                  tasks.withType(Test) {
+                      enabled = false
+                      setEnabled(false)
+                  }
+                  checkstyleMain {
+                      enabled = true
+                      destination = file('x')
+                  }
+                  reports.html.enabled = false
+                  html.enabled = false
+                  """
+              ),
+              buildGradleKts(
+                """
+                  tasks.test {
+                      enabled = false
+                      isEnabled = false
+                  }
+                  """,
+                spec -> spec.path("sub/build.gradle.kts")
+              )
+            );
+        }
+
+        @Test
+        void doNotChangeReportsOfOtherOwners() {
+            rewriteRun(
+              buildGradle(
+                """
+                  detekt {
+                      reports {
+                          html {
+                              enabled = true
+                              destination = file('x')
+                          }
+                          xml.enabled = false
+                      }
+                  }
+                  kover {
+                      reports.html.enabled = false
+                  }
+                  tasks.withType(Foo) {
+                      reports {
+                          html.enabled = false
+                      }
+                  }
+                  task custom(type: Foo) {
+                      reports.html.enabled = false
+                  }
+                  ext.reports.html.enabled = false
+                  testing {
+                      suites {
+                          test {
+                              reports.html.enabled = false
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotChangeOtherPropertiesOfReports() {
+            rewriteRun(
+              buildGradle(
+                """
+                  test {
+                      reports {
+                          html {
+                              required = true
+                              outputLocation = file('x')
+                              stylesheet = 'x'
+                          }
+                          foo.enabled = false
+                          foo {
+                              enabled = false
+                          }
+                      }
+                      reports.foo.enabled = false
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotChangeReads() {
+            rewriteRun(
+              buildGradle(
+                """
+                  def isOn = test.reports.html.enabled
+                  test {
+                      reports {
+                          println(html.destination)
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotChangeScriptVariable() {
+            rewriteRun(
+              buildGradle(
+                """
+                  def reports = [:]
+                  test {
+                      reports.html.enabled = false
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class MethodInvocationToAssignments {
         @Test
         void deprecationsInMethodInvocationSyntax() {

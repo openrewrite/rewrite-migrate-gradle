@@ -43,6 +43,8 @@ recipeList:
       newConfiguration: testRuntimeOnly
   # Gradle 6.0 removed JacocoTaskExtension.append, and the agent now always appends
   - org.openrewrite.gradle.migrate.jacoco.RemoveJacocoTaskExtensionAppend
+  # Gradle 6.0 removed the JacocoReportBase setters; assigning fails on 6.9 and 7.6, and setFrom works on every version
+  - org.openrewrite.gradle.migrate.jacoco.UseSetFromForJacocoFileCollections
   # https://github.com/gradle/gradle/blob/v5.6.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
   # https://github.com/gradle/gradle/blob/v6.9.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
   - org.openrewrite.gradle.RemoveEnableFeaturePreview:

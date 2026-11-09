@@ -85,7 +85,7 @@ public class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContex
         if ("set".equals(m.getSimpleName())) {
             return assignsProperty(m.getSelect());
         }
-        return setterName().equals(m.getSimpleName()) && namesOwner(m.getSelect());
+        return setterName().equals(m.getSimpleName()) && namesOwner(m.getSelect()) && !creates(m.getSelect());
     }
 
     private boolean assignsProperty(Expression variable) {
@@ -94,7 +94,8 @@ public class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContex
         }
         if (variable instanceof J.FieldAccess) {
             J.FieldAccess fieldAccess = (J.FieldAccess) variable;
-            return propertyName.equals(fieldAccess.getSimpleName()) && !isExtraProperty(fieldAccess.getTarget()) &&
+            return propertyName.equals(fieldAccess.getSimpleName()) &&
+                    !isExtraProperty(fieldAccess.getTarget()) && !creates(fieldAccess.getTarget()) &&
                     (namesOwner(fieldAccess.getTarget()) || isInsideOwnerBlock());
         }
         return false;
@@ -105,6 +106,18 @@ public class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContex
      */
     private static boolean isExtraProperty(Expression target) {
         return target instanceof J.Identifier && "ext".equals(((J.Identifier) target).getSimpleName());
+    }
+
+    /**
+     * Whether deleting a statement made on this expression would also delete the creation of what it creates, as in
+     * {@code tasks.create('x').prop = value}.
+     */
+    private static boolean creates(@Nullable Expression expression) {
+        if (expression instanceof J.MethodInvocation) {
+            J.MethodInvocation m = (J.MethodInvocation) expression;
+            return TASK_CREATING_METHODS.contains(m.getSimpleName()) || creates(m.getSelect());
+        }
+        return expression instanceof J.FieldAccess && creates(((J.FieldAccess) expression).getTarget());
     }
 
     private boolean namesOwner(@Nullable Expression expression) {
@@ -183,8 +196,7 @@ public class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContex
 
     private @Nullable J deleteIfLeftEmptyByRemoval(J.MethodInvocation m) {
         if (!Boolean.TRUE.equals(getCursor().getMessage(REMOVED_STATEMENT)) || !isDeletableStatement() ||
-                m.getArguments().isEmpty() || TASK_CREATING_METHODS.contains(m.getSimpleName()) ||
-                !identifiesOwner(m)) {
+                m.getArguments().isEmpty() || creates(m) || !identifiesOwner(m)) {
             return m;
         }
         Expression last = m.getArguments().get(m.getArguments().size() - 1);
