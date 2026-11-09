@@ -64,6 +64,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.kotlindsl.UseContainerMethodsInsteadOfDelegates
   # The org.gradle.unsafe.isolated-projects* properties are deprecated in 9.7
   - org.openrewrite.gradle.migrate.properties.MigrateIsolatedProjectsProperties
+  # Provider.forUseAtConfigurationTime() is gone in Gradle 9; it was already a no-op from 7.4
+  - org.openrewrite.gradle.migrate.providers.RemoveForUseAtConfigurationTime
   # Project.container(Class) only warns until Gradle 10, and ObjectFactory rejects element classes it accepts, such as a final
   # class in another file, which the recipe cannot see. Run it on its own and check the build.
   # - org.openrewrite.gradle.migrate.model.UseObjectFactoryDomainObjectContainer
