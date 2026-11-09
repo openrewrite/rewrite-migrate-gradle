@@ -37,6 +37,9 @@ recipeList:
       previewFeatureName: VERSION_ORDERING_V2
   - org.openrewrite.gradle.RemoveEnableFeaturePreview:
       previewFeatureName: VERSION_CATALOGS
+  # com.gradle.plugin-publish before 1.0 calls Jar.getArchivePath(), removed in Gradle 8.0, so the plugin
+  # and the pluginBundle block it drops in 1.0 have to move together with the wrapper
+  - org.openrewrite.gradle.migrate.plugins.MigratePluginPublishPlugin
   # https://docs.gradle.org/8.14/userguide/upgrading_version_8.html#groovy_space_assignment_syntax
   - org.openrewrite.gradle.migrate.UseAssignmentForPropertySyntax
 ---
