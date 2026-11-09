@@ -31,6 +31,8 @@ recipeList:
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
+  # AbstractOptions.define(Map), CompileOptions.fork(Map) and debug(Map) are removed in 9.0
+  - org.openrewrite.gradle.migrate.java.UseCompileOptionsProperties
   # The Kotlin DSL's "name"() lookup does not compile on 9.0
   - org.openrewrite.gradle.migrate.tasks.UseNamedInsteadOfStringInvoke
   # WriteProperties.outputFile is removed in 9.0
