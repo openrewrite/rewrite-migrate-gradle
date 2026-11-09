@@ -24,10 +24,24 @@ recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 8.x
       addIfMissing: false
+  # Gradle 8.0 no longer allows a Configuration as a dependency; 6.9 and 7.6 show that it amounted to extendsFrom
+  - org.openrewrite.gradle.migrate.artifacts.UseExtendsFromForConfigurationDependencies
+  # Gradle 8.0 removed Substitution.with(ComponentSelector) in favor of using; with still works on 7.6
+  - org.openrewrite.gradle.migrate.artifacts.UseUsingForDependencySubstitution
+  # Gradle 8.0 removed the Configuration extensions on NamedDomainObjectProvider<Configuration> from the Kotlin DSL
+  - org.openrewrite.gradle.migrate.artifacts.UseGetOnConfigurationAccessors
   # https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup
   - org.openrewrite.gradle.migrate.jacoco.JacocoReportDeprecations
   # Already a compile error in Kotlin on 8.x, deprecated in Groovy since 8.2 and removed in 9.0
   - org.openrewrite.gradle.migrate.tasks.UseTaskPropertiesForPluginConventions
+  - org.openrewrite.gradle.migrate.application.UseApplicationBlockForConventionProperties
+  # Gradle 8.0 removed these, except TestReport.destinationDir which Gradle 9 removes; all replacements work on Gradle 8
+  - org.openrewrite.gradle.migrate.tasks.MigrateTaskOutputProperties
+  # https://docs.gradle.org/current/userguide/upgrading_version_7.html#v7_java_exec_api_cleanup
+  - org.openrewrite.gradle.migrate.tasks.UseMainClassProperty
+  # https://docs.gradle.org/current/userguide/upgrading_version_7.html#v7_java_application_api_cleanup
+  - org.openrewrite.gradle.migrate.application.UseMainClassPropertyForApplication
+  - org.openrewrite.gradle.migrate.tasks.MigrateArchiveClassifier
   # https://docs.gradle.org/8.11.1/userguide/upgrading_version_8.html#test_framework_implementation_dependencies
   - org.openrewrite.gradle.AddJUnitPlatformLauncher
   # https://github.com/gradle/gradle/blob/v7.6.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
@@ -38,8 +52,13 @@ recipeList:
       previewFeatureName: VERSION_ORDERING_V2
   - org.openrewrite.gradle.RemoveEnableFeaturePreview:
       previewFeatureName: VERSION_CATALOGS
+  # com.gradle.plugin-publish before 1.0 calls Jar.getArchivePath(), removed in Gradle 8.0, so the plugin
+  # and the pluginBundle block it drops in 1.0 have to move together with the wrapper
+  - org.openrewrite.gradle.migrate.plugins.MigratePluginPublishPlugin
   # https://docs.gradle.org/8.14/userguide/upgrading_version_8.html#groovy_space_assignment_syntax
   - org.openrewrite.gradle.migrate.UseAssignmentForPropertySyntax
+  # The org.gradle.unsafe.configuration-cache* properties were renamed in 8.1; the legacy names still work on 9.8.2
+  - org.openrewrite.gradle.migrate.properties.MigrateConfigurationCacheProperties
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.migrate.UseAssignmentForPropertySyntax
@@ -76,3 +95,5 @@ recipeList:
       propertyName: archiveExtension
   - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
       propertyName: archiveFileName
+  # Not `propertyName: url`: a `url` in a pom.withXml builder closure adds an XML node, and fails as an assignment
+  - org.openrewrite.gradle.migrate.artifacts.UseAssignmentForRepositoryUrl
