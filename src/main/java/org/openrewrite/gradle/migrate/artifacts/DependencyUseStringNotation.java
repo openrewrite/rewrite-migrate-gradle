@@ -55,8 +55,15 @@ public class DependencyUseStringNotation extends Recipe {
     final String description = "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
         "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`, " +
         "or as positional parameters like `(\"groupId\", \"artifactId\", \"version\")`. " +
-        "This recipe replaces dependencies represented as `Maps` or positional parameters with an equivalent dependency represented as a `String`, " +
-        "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
+        "Gradle 9.1 deprecated the latter two, which it calls the multi-string notation: it \"has been deprecated and " +
+        "will no longer be permitted in Gradle 10\", see the " +
+        "[Gradle 9 upgrade guide](https://docs.gradle.org/current/userguide/upgrading_version_9.html). " +
+        "Building with `--warning-mode=fail` already fails on it. " +
+        "This recipe replaces dependencies represented as `Maps` or positional parameters with an equivalent dependency " +
+        "represented as a `String`, which is also the " +
+        "[Gradle best practice of declaring dependencies with a single GAV](https://docs.gradle.org/current/userguide/best_practices_dependencies.html#single-gav-string). " +
+        "Modifiers such as `exclude group: 'groupId', module: 'artifactId'` are left alone: Gradle exempts them from " +
+        "the recommendation and they are not part of the deprecation.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
