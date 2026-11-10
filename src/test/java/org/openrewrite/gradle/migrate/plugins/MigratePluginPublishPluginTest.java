@@ -486,6 +486,84 @@ class MigratePluginPublishPluginTest implements RewriteTest {
     }
 
     @Test
+    void migrateEverySiblingScriptThatCanMoveItsBundle() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '0.12.0'
+              }
+
+              pluginBundle {
+                  website = 'https://example.com'
+              }
+
+              gradlePlugin {
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '1.3.1'
+              }
+
+              gradlePlugin {
+                  website = 'https://example.com'
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                      }
+                  }
+              }
+              """,
+            spec -> spec.path("widget/build.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '0.12.0'
+              }
+
+              pluginBundle {
+                  website = 'https://example.com'
+              }
+
+              gradlePlugin {
+                  plugins {
+                      gadget {
+                          id = 'com.acme.gadget'
+                          implementationClass = 'com.acme.GadgetPlugin'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish' version '1.3.1'
+              }
+
+              gradlePlugin {
+                  website = 'https://example.com'
+                  plugins {
+                      gadget {
+                          id = 'com.acme.gadget'
+                          implementationClass = 'com.acme.GadgetPlugin'
+                      }
+                  }
+              }
+              """,
+            spec -> spec.path("gadget/build.gradle")
+          )
+        );
+    }
+
+    @Test
     void upgradeTheVersionWhenThereIsNoPluginBundle() {
         rewriteRun(
           buildGradle(
@@ -678,6 +756,92 @@ class MigratePluginPublishPluginTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipe(new MigratePluginPublishPlugin());
+        }
+
+        @Test
+        void doNotBumpWhileAnAppliedScriptsBundleIsLeftBehind() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-gradle-plugin'
+                      id 'com.gradle.plugin-publish' version '0.18.0'
+                  }
+
+                  apply from: 'upload.gradle'
+                  """,
+                spec -> spec.path("plugin/build.gradle")
+              ),
+              buildGradle(
+                """
+                  gradlePlugin {
+                      plugins {
+                          widgetPlugin {
+                              id = 'com.acme.widget'
+                              implementationClass = 'com.acme.WidgetPlugin'
+                          }
+                      }
+                  }
+
+                  pluginBundle {
+                      website = 'https://example.com'
+
+                      plugins {
+                          widgetPlugin {
+                              displayName = 'Widget'
+                          }
+                      }
+                  }
+                  """,
+                spec -> spec.path("plugin/upload.gradle")
+              )
+            );
+        }
+
+        @Test
+        void doNotMigrateOneScriptWhileAnotherBundleIsLeftBehind() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.gradle.plugin-publish' version '0.19.0'
+                  }
+
+                  pluginBundle {
+                      website = 'https://example.com'
+                  }
+
+                  gradlePlugin {
+                      plugins {
+                          widget {
+                              id = 'com.acme.widget'
+                              implementationClass = 'com.acme.WidgetPlugin'
+                          }
+                      }
+                  }
+                  """,
+                spec -> spec.path("widget/build.gradle")
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.gradle.plugin-publish' version '0.19.0'
+                  }
+
+                  pluginBundle {
+                      website = 'https://example.com'
+
+                      plugins {
+                          gadget {
+                              id = 'com.acme.gadget'
+                              displayName = 'Gadget'
+                          }
+                      }
+                  }
+                  """,
+                spec -> spec.path("gadget/build.gradle")
+              )
+            );
         }
 
         @Test
