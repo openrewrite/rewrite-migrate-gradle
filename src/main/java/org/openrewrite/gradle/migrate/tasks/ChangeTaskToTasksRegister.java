@@ -17,7 +17,6 @@ package org.openrewrite.gradle.migrate.tasks;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyIsoVisitor;
@@ -30,7 +29,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinTemplate;
-import org.openrewrite.kotlin.tree.K;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,26 +44,10 @@ public class ChangeTaskToTasksRegister extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new TreeVisitor<Tree, ExecutionContext>() {
-
-                    @Override
-                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                        if (tree == null) {
-                            return null;
-                        }
-                        if (tree instanceof G.CompilationUnit) {
-                            return new GroovyVisitor().visit(tree, ctx);
-                        }
-                        if (tree instanceof K.CompilationUnit) {
-                            return new KotlinVisitor().visit(tree, ctx);
-                        }
-                        return tree;
-                    }
-                }
-        );
+        return Preconditions.check(new IsBuildGradle<>(), Preconditions.or(new GroovyScriptVisitor(), new KotlinScriptVisitor()));
     }
 
-    private static class GroovyVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class GroovyScriptVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -164,7 +146,7 @@ public class ChangeTaskToTasksRegister extends Recipe {
         }
     }
 
-    private static class KotlinVisitor extends KotlinIsoVisitor<ExecutionContext> {
+    private static class KotlinScriptVisitor extends KotlinIsoVisitor<ExecutionContext> {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
