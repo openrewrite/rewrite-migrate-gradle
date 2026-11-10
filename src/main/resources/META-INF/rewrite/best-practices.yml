@@ -21,9 +21,12 @@ displayName: Apply Gradle best practices
 description: >-
   Apply the [Gradle best practices](https://docs.gradle.org/current/userguide/best_practices_general.html) that can be
   applied mechanically. Run alongside `org.openrewrite.gradle.GradleBestPractices`, which carries the practices whose
-  fix was already a recipe in `rewrite-gradle`. Practices whose fix needs a judgement the build files do not contain
-  are deliberately left out, each with its reason below.
+  fix was already a recipe in `rewrite-gradle`. Leads with `MigrateToGradle9`, since most of these practices are the
+  conventions the current Gradle expects and several of the recipes below only apply cleanly once the build is on it.
+  Practices whose fix needs a judgement the build files do not contain are deliberately left out, each with its reason
+  below.
 recipeList:
+  - org.openrewrite.gradle.migrate.MigrateToGradle9
   - org.openrewrite.gradle.migrate.wrapper.AddGradleWrapperChecksum
   - org.openrewrite.gradle.migrate.properties.UseUtf8FileEncoding
   - org.openrewrite.gradle.migrate.settings.AddRootProjectName
@@ -34,6 +37,7 @@ recipeList:
   - org.openrewrite.gradle.migrate.logging.UseLoggingGetLogger
   - org.openrewrite.gradle.migrate.plugins.UsePluginsBlock
   - org.openrewrite.gradle.migrate.plugins.UseWithPluginInsteadOfHasPlugin
+  - org.openrewrite.gradle.migrate.tasks.ChangeTaskToTasksRegister
 #  - org.openrewrite.gradle.migrate.properties.EnableGradleConfigurationCache  # the catalog's own fix is
 #    "add it, then run the build and fix what it surfaces"; a recipe can only do the first half
 #  - org.openrewrite.gradle.migrate.tasks.UseDefaultPathSensitivity  # changes task cache keys; a task that writes its
@@ -42,8 +46,9 @@ recipeList:
 #      distribution: bin                          # Gradle 9 migration already does, the two never settle in one
 #                                                 # cycle: whichever runs second finds the BuildTool marker already
 #                                                 # bumped and bails, and with no marker the last one simply wins
-#  - org.openrewrite.gradle.MigrateDependenciesToVersionCatalog  # use_version_catalogs; it generates camelCase keys
-#    (libs.springCore), which contradicts name_version_catalog_entries (spring-core, reached as libs.spring.core)
+#  - org.openrewrite.gradle.migrate.artifacts.MigrateDependenciesToVersionCatalog  # use_version_catalogs; it
+#    generates camelCase keys (libs.springCore), which contradicts name_version_catalog_entries (spring-core,
+#    reached as libs.spring.core)
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.migrate.properties.UseUtf8FileEncoding
