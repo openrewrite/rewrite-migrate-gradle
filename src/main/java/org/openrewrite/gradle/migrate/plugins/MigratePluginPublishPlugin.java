@@ -81,8 +81,10 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
             "checked-in `META-INF/gradle-plugins/<id>.properties` descriptor, which is then deleted: Gradle generates " +
             "it from the declaration, and a checked-in copy of what it generates makes `processResources` fail on a " +
             "duplicate entry from Gradle 7 on. A redundant descriptor is deleted for a plugin the script already " +
-            "declares, too. A script this recipe cannot migrate in full keeps its old plugin version, rather than being " +
-            "left bumped and broken: that is a `pluginBundle` holding `mavenCoordinates`, a `version` other than the " +
+            "declares, too. A `pluginBundle` this recipe cannot migrate leaves the whole repository alone, its other " +
+            "scripts and their plugin versions included, rather than leaving it bumped and broken: Gradle resolves the " +
+            "plugin for the build, so a block left behind in one script breaks the build whichever script declares the " +
+            "version. What it cannot migrate is a `pluginBundle` holding `mavenCoordinates`, a `version` other than the " +
             "project's, or anything else unrecognized, a declaration in `pluginBundle { plugins { } }` with no " +
             "counterpart in `gradlePlugin { plugins { } }`, and a plugin declared in neither block or with no " +
             "descriptor to take its implementation class from. Kotlin scripts are left alone. " +
@@ -103,6 +105,10 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
         final Map<Path, Map<String, String>> implementationClasses = new HashMap<>();
         /** Descriptors Gradle generates once the script declares the plugin, so the checked-in copy goes. */
         final Set<Path> deletable = new HashSet<>();
+        /** Every script holding a {@code pluginBundle} block, and whether the block can move where it is. */
+        final Map<Path, Boolean> bundles = new HashMap<>();
+        /** The scripts whose {@code pluginBundle} this recipe would leave behind, settled in {@link #generate}. */
+        final Set<Path> leftBehind = new HashSet<>();
     }
 
     /** What one build script needs looked up, before any descriptor has been read. */
@@ -140,10 +146,17 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
                 }
                 G.CompilationUnit cu = (G.CompilationUnit) tree;
                 Bundle bundle = findBundle(cu);
-                if (!declaresPluginPublish(cu) || bundle == null || !bundle.migratable) {
+                if (bundle == null) {
                     return tree;
                 }
                 J.MethodInvocation gradlePlugin = findGradlePlugin(cu.getStatements());
+                // Recorded for every block, migratable or not, because one this recipe cannot move
+                // decides what happens to the whole repository.
+                acc.bundles.put(cu.getSourcePath(), bundle.migratable && declaresPluginPublish(cu) &&
+                        gradlePlugin != null && canTakeBundle(gradlePlugin, bundle));
+                if (!bundle.migratable || !declaresPluginPublish(cu)) {
+                    return tree;
+                }
                 acc.requests.put(cu.getSourcePath(), gradlePlugin == null ?
                         new Request(cu.getSourcePath().getParent(), bundle.declaredIds, emptyMap()) :
                         new Request(cu.getSourcePath().getParent(), emptyMap(), declaredImplementationClasses(gradlePlugin)));
@@ -190,6 +203,22 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
                 }
             }
         }
+
+        // Which blocks are left behind can only be settled once the descriptors are reconciled above,
+        // since a script with no gradlePlugin { plugins { } } of its own is migratable exactly when one
+        // was found for every plugin it declares.
+        for (Map.Entry<Path, Boolean> bundle : acc.bundles.entrySet()) {
+            if (!bundle.getValue() && !acc.implementationClasses.containsKey(bundle.getKey())) {
+                acc.leftBehind.add(bundle.getKey());
+            }
+        }
+        if (!acc.leftBehind.isEmpty()) {
+            // Gradle resolves plugin-publish for the build rather than for one script, so a block left
+            // anywhere in the repository calls a method 1.x does not have wherever the version is
+            // declared. The repository is the unit: all of it migrates, or none of it does.
+            acc.deletable.clear();
+            acc.implementationClasses.clear();
+        }
         return emptyList();
     }
 
@@ -205,6 +234,11 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
                     return tree;
                 }
                 G.CompilationUnit cu = (G.CompilationUnit) tree;
+                if (!acc.leftBehind.isEmpty()) {
+                    // A block this recipe cannot move, anywhere in the repository. See generate.
+                    return cu;
+                }
+
                 Bundle bundle = findBundle(cu);
                 // A `pluginBundle { }` left behind on 1.x fails the build as it stands, with
                 // "Could not find method pluginBundle()", so the block is moved whatever version the
@@ -535,11 +569,7 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
 
     private static @Nullable List<Statement> moveBundle(List<Statement> statements, Bundle bundle, Cursor scope, ExecutionContext ctx) {
         J.MethodInvocation gradlePlugin = findGradlePlugin(statements);
-        if (gradlePlugin == null) {
-            return null;
-        }
-        List<String> declared = declaredPluginNames(gradlePlugin);
-        if (declared == null || declared.isEmpty() || !declared.containsAll(bundle.perPlugin.keySet())) {
+        if (gradlePlugin == null || !canTakeBundle(gradlePlugin, bundle)) {
             return null;
         }
 
@@ -604,6 +634,16 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
     /** A Groovy single-quoted string, for the two values that come from a properties file. */
     private static String quote(String value) {
         return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'";
+    }
+
+    /**
+     * Whether {@code gradlePlugin { plugins { } }} declares every plugin the bundle names, which is what
+     * the bundle's per-plugin values are moved onto. Asked of the scan as well as of the edit, so that
+     * what the scan counts as left behind is what the edit leaves behind.
+     */
+    private static boolean canTakeBundle(J.MethodInvocation gradlePlugin, Bundle bundle) {
+        List<String> declared = declaredPluginNames(gradlePlugin);
+        return declared != null && !declared.isEmpty() && declared.containsAll(bundle.perPlugin.keySet());
     }
 
     private static @Nullable List<String> declaredPluginNames(J.MethodInvocation gradlePlugin) {
