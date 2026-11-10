@@ -398,6 +398,94 @@ class MigratePluginPublishPluginTest implements RewriteTest {
     }
 
     @Test
+    void moveTheBundleLeftBehindOnOneDotX() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-gradle-plugin'
+                  id 'com.gradle.plugin-publish' version '1.2.1'
+              }
+
+              pluginBundle {
+                  website = 'https://github.com/acme/widget'
+                  vcsUrl = 'https://github.com/acme/widget.git'
+                  tags = ['acme', 'widget']
+              }
+
+              gradlePlugin {
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java-gradle-plugin'
+                  id 'com.gradle.plugin-publish' version '1.2.1'
+              }
+
+              gradlePlugin {
+                  website = 'https://github.com/acme/widget'
+                  vcsUrl = 'https://github.com/acme/widget.git'
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                          tags = ['acme', 'widget']
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void moveTheBundleWhenThePluginDeclaresNoVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish'
+              }
+
+              pluginBundle {
+                  website = 'https://github.com/acme/widget'
+              }
+
+              gradlePlugin {
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.plugin-publish'
+              }
+
+              gradlePlugin {
+                  website = 'https://github.com/acme/widget'
+                  plugins {
+                      widget {
+                          id = 'com.acme.widget'
+                          implementationClass = 'com.acme.WidgetPlugin'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradeTheVersionWhenThereIsNoPluginBundle() {
         rewriteRun(
           buildGradle(
@@ -593,7 +681,38 @@ class MigratePluginPublishPluginTest implements RewriteTest {
         }
 
         @Test
-        void doNotChangeWhenAlreadyOnOneDotX() {
+        void doNotChangeALeftoverBundleHoldingMavenCoordinates() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.gradle.plugin-publish' version '1.2.1'
+                  }
+
+                  pluginBundle {
+                      website = 'https://example.com'
+
+                      mavenCoordinates {
+                          groupId = 'com.acme'
+                          artifactId = 'widget'
+                      }
+                  }
+
+                  gradlePlugin {
+                      plugins {
+                          widget {
+                              id = 'com.acme.widget'
+                              implementationClass = 'com.acme.WidgetPlugin'
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotChangeWhenAlreadyOnOneDotXWithNoPluginBundle() {
             rewriteRun(
               buildGradle(
                 """

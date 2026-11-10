@@ -72,7 +72,9 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
             "`pluginBundle { }` block in turn, so bumping the version alone fails with " +
             "\"Could not find method pluginBundle()\". This recipe does both at once: it moves `website` and `vcsUrl` " +
             "onto `gradlePlugin`, and `description`, `displayName` and `tags` onto each plugin `gradlePlugin { plugins { } }` " +
-            "declares, then removes `pluginBundle` and upgrades the plugin to " + NEW_VERSION + ". `tags = [..]` on the " +
+            "declares, then removes `pluginBundle` and upgrades the plugin to " + NEW_VERSION + ". A script already on " +
+            "1.x that kept its `pluginBundle` block has that block moved too, without its version being touched: such a " +
+            "build fails as it stands with \"Could not find method pluginBundle()\". `tags = [..]` on the " +
             "declaration needs Gradle 8.2 or later, which `MigrateToGradle8` upgrades to. A script with no " +
             "`gradlePlugin { plugins { } }` of its own, which declares its plugins only in " +
             "`pluginBundle { plugins { } }`, has that block written for it, taking each `implementationClass` from the " +
@@ -138,7 +140,7 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
                 }
                 G.CompilationUnit cu = (G.CompilationUnit) tree;
                 Bundle bundle = findBundle(cu);
-                if (!declaresOldPluginPublish(cu) || bundle == null || !bundle.migratable) {
+                if (!declaresPluginPublish(cu) || bundle == null || !bundle.migratable) {
                     return tree;
                 }
                 J.MethodInvocation gradlePlugin = findGradlePlugin(cu.getStatements());
@@ -203,11 +205,15 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
                     return tree;
                 }
                 G.CompilationUnit cu = (G.CompilationUnit) tree;
-                if (!declaresOldPluginPublish(cu)) {
+                Bundle bundle = findBundle(cu);
+                // A `pluginBundle { }` left behind on 1.x fails the build as it stands, with
+                // "Could not find method pluginBundle()", so the block is moved whatever version the
+                // script asks for; only a version below 1 is bumped. With no block to move, there is
+                // nothing to do unless the version itself is old.
+                if (!(bundle == null ? declaresOldPluginPublish(cu) : declaresPluginPublish(cu))) {
                     return cu;
                 }
 
-                Bundle bundle = findBundle(cu);
                 if (bundle != null && !bundle.migratable) {
                     // Leaving the version alone as well, so the build is not left bumped and broken.
                     return cu;
@@ -287,6 +293,39 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
                     return true;
                 }
             }
+        }
+        return false;
+    }
+
+    /** Whether {@code plugins { }} asks for plugin-publish at all, whatever version it names. */
+    private static boolean declaresPluginPublish(G.CompilationUnit cu) {
+        for (Statement s : cu.getStatements()) {
+            J.MethodInvocation block = asBlock(s, "plugins");
+            if (block == null) {
+                continue;
+            }
+            for (Statement entry : blockBody(block).getStatements()) {
+                if (declaresPluginPublishId(entry)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether one {@code plugins { }} entry names plugin-publish. The id call is the innermost of the
+     * chain, so this walks down the selects of {@code id 'x' version 'y' apply false} alike, and matches
+     * {@code id 'x'} on its own, where the version is declared somewhere else.
+     */
+    private static boolean declaresPluginPublishId(Statement entry) {
+        J.MethodInvocation call = asInvocation(entry);
+        while (call != null) {
+            if ("id".equals(call.getSimpleName()) && call.getArguments().size() == 1 &&
+                    PLUGIN_ID.equals(stringValue(call.getArguments().get(0)))) {
+                return true;
+            }
+            call = call.getSelect() instanceof J.MethodInvocation ? (J.MethodInvocation) call.getSelect() : null;
         }
         return false;
     }
