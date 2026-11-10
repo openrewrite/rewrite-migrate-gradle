@@ -39,16 +39,10 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeTaskToTasksRegister extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Change Gradle task eager creation to lazy registration";
-    }
+    String displayName = "Change Gradle task eager creation to lazy registration";
 
-    @Override
-    public String getDescription() {
-        return "Changes eager task creation `task exampleName(type: ExampleType)` to lazy registration `tasks.register(\"exampleName\", ExampleType)`. " +
-                "Also supports Kotlin DSL: `task<ExampleType>(\"exampleName\")` to `tasks.register<ExampleType>(\"exampleName\")`.";
-    }
+    String description = "Changes eager task creation `task exampleName(type: ExampleType)` to lazy registration `tasks.register(\"exampleName\", ExampleType)`. " +
+            "Also supports Kotlin DSL: `task<ExampleType>(\"exampleName\")` to `tasks.register<ExampleType>(\"exampleName\")`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
