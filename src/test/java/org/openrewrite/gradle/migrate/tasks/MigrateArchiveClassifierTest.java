@@ -362,7 +362,7 @@ class MigrateArchiveClassifierTest implements RewriteTest {
     @Test
     void composedInGradle8Migration() {
         rewriteRun(
-          spec -> spec.recipeFromResources("org.openrewrite.gradle.MigrateToGradle8"),
+          spec -> spec.recipeFromResources("org.openrewrite.gradle.migrate.MigrateToGradle8"),
           buildGradle(
             """
               plugins { id 'java' }
