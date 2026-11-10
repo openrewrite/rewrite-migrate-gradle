@@ -43,8 +43,9 @@ recipeList:
 #      distribution: bin                          # Gradle 9 migration already does, the two never settle in one
 #                                                 # cycle: whichever runs second finds the BuildTool marker already
 #                                                 # bumped and bails, and with no marker the last one simply wins
-#  - org.openrewrite.gradle.MigrateDependenciesToVersionCatalog  # use_version_catalogs; it generates camelCase keys
-#    (libs.springCore), which contradicts name_version_catalog_entries (spring-core, reached as libs.spring.core)
+#  - org.openrewrite.gradle.migrate.artifacts.MigrateDependenciesToVersionCatalog  # use_version_catalogs; it
+#    generates camelCase keys (libs.springCore), which contradicts name_version_catalog_entries (spring-core,
+#    reached as libs.spring.core)
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.migrate.properties.UseUtf8FileEncoding
