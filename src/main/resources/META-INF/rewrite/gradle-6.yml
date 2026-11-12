@@ -47,9 +47,9 @@ recipeList:
   - org.openrewrite.gradle.migrate.jacoco.UseSetFromForJacocoFileCollections
   # https://github.com/gradle/gradle/blob/v5.6.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
   # https://github.com/gradle/gradle/blob/v6.9.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
-  - org.openrewrite.gradle.RemoveEnableFeaturePreview:
+  - org.openrewrite.gradle.migrate.settings.RemoveEnableFeaturePreview:
       previewFeatureName: IMPROVED_POM_SUPPORT
-  - org.openrewrite.gradle.RemoveEnableFeaturePreview:
+  - org.openrewrite.gradle.migrate.settings.RemoveEnableFeaturePreview:
       previewFeatureName: STABLE_PUBLISHING
-  - org.openrewrite.gradle.RemoveEnableFeaturePreview:
+  - org.openrewrite.gradle.migrate.settings.RemoveEnableFeaturePreview:
       previewFeatureName: INCREMENTAL_ARTIFACT_TRANSFORMATIONS
