@@ -46,11 +46,11 @@ recipeList:
   - org.openrewrite.gradle.AddJUnitPlatformLauncher
   # https://github.com/gradle/gradle/blob/v7.6.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
   # https://github.com/gradle/gradle/blob/v8.10.1/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
-  - org.openrewrite.gradle.RemoveEnableFeaturePreview:
+  - org.openrewrite.gradle.migrate.settings.RemoveEnableFeaturePreview:
       previewFeatureName: ONE_LOCKFILE_PER_PROJECT
-  - org.openrewrite.gradle.RemoveEnableFeaturePreview:
+  - org.openrewrite.gradle.migrate.settings.RemoveEnableFeaturePreview:
       previewFeatureName: VERSION_ORDERING_V2
-  - org.openrewrite.gradle.RemoveEnableFeaturePreview:
+  - org.openrewrite.gradle.migrate.settings.RemoveEnableFeaturePreview:
       previewFeatureName: VERSION_CATALOGS
   # com.gradle.plugin-publish before 1.0 calls Jar.getArchivePath(), removed in Gradle 8.0, so the plugin
   # and the pluginBundle block it drops in 1.0 have to move together with the wrapper
