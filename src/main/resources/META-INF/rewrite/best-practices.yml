@@ -20,8 +20,8 @@ name: org.openrewrite.gradle.migrate.GradleBestPractices
 displayName: Apply Gradle best practices
 description: >-
   Apply the [Gradle best practices](https://docs.gradle.org/current/userguide/best_practices_general.html) that can be
-  applied mechanically. Run alongside `org.openrewrite.gradle.GradleBestPractices`, which carries the practices whose
-  fix was already a recipe in `rewrite-gradle`. Leads with `MigrateToGradle9`, since most of these practices are the
+  applied mechanically, including the practices whose fix was already a recipe in `rewrite-gradle` and used to be
+  carried by `org.openrewrite.gradle.GradleBestPractices`. Leads with `MigrateToGradle9`, since most of these are the
   conventions the current Gradle expects and several of the recipes below only apply cleanly once the build is on it.
   Practices whose fix needs a judgement the build files do not contain are deliberately left out, each with its reason
   below.
@@ -38,6 +38,21 @@ recipeList:
   - org.openrewrite.gradle.migrate.plugins.UsePluginsBlock
   - org.openrewrite.gradle.migrate.plugins.UseWithPluginInsteadOfHasPlugin
   - org.openrewrite.gradle.migrate.tasks.ChangeTaskToTasksRegister
+  # Absorbed from `org.openrewrite.gradle.GradleBestPractices`, which this bundle replaces. These keep their
+  # `org.openrewrite.gradle.*` ids: they are generic building blocks that stay in `rewrite-gradle`.
+  - org.openrewrite.gradle.EnableGradleBuildCache
+  - org.openrewrite.gradle.EnableGradleParallelExecution
+  - org.openrewrite.gradle.RemoveRedundantDependencyVersions
+  - org.openrewrite.gradle.RemoveRedundantSecurityResolutionRules
+  - org.openrewrite.gradle.SortDependencies
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: distributionUrl
+  - org.openrewrite.gradle.RemoveEmptyBuildscriptBlock
+#  - org.openrewrite.gradle.security.UseHttpsForRepositories  # the one practice of that bundle left behind:
+#    `MigrateToGradle9` above already reaches `migrate.artifacts.MigrateHttpRepositories`, which switches only hosts
+#    known to serve HTTPS and gives any other one `allowInsecureProtocol = true`. This one rewrites every `http://`
+#    repository URL to `https://` regardless, so running both would leave an HTTPS URL that may not resolve beside a
+#    stranded opt-in. It stays a standalone recipe in `rewrite-gradle`; reconciling the two is its own decision.
 #  - org.openrewrite.gradle.migrate.properties.EnableGradleConfigurationCache  # the catalog's own fix is
 #    "add it, then run the build and fix what it surfaces"; a recipe can only do the first half
 #  - org.openrewrite.gradle.migrate.tasks.UseDefaultPathSensitivity  # changes task cache keys; a task that writes its
