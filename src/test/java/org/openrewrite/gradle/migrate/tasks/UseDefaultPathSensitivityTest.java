@@ -151,10 +151,8 @@ class UseDefaultPathSensitivityTest implements RewriteTest {
         );
     }
 
-    /**
-     * The right sensitivity for a file collection depends on whether the task cares about the names within it, which
-     * the annotation alone does not say, so `@InputFiles` is reported by the catalog but not changed here.
-     */
+    /// The right sensitivity for a file collection depends on whether the task cares about the names within it, which
+    /// the annotation alone does not say, so `@InputFiles` is reported by the catalog but not changed here.
     @Test
     void noChangeToAFileCollectionInput() {
         rewriteRun(

@@ -107,10 +107,8 @@ class UsePluginsBlockTest implements RewriteTest {
         );
     }
 
-    /**
-     * A third-party plugin in a `plugins` block needs a version, or a `buildscript` classpath entry that the block
-     * cannot see. Rewriting it without resolving that would stop the build configuring, so it is left alone.
-     */
+    /// A third-party plugin in a `plugins` block needs a version, or a `buildscript` classpath entry that the block
+    /// cannot see. Rewriting it without resolving that would stop the build configuring, so it is left alone.
     @Test
     void noChangeForThirdPartyPlugin() {
         rewriteRun(
@@ -122,10 +120,8 @@ class UsePluginsBlockTest implements RewriteTest {
         );
     }
 
-    /**
-     * A `plugins` block applies only to the script it appears in, so an apply inside `subprojects` or `allprojects`
-     * has no equivalent there.
-     */
+    /// A `plugins` block applies only to the script it appears in, so an apply inside `subprojects` or `allprojects`
+    /// has no equivalent there.
     @Test
     void noChangeInsideSubprojects() {
         rewriteRun(
@@ -139,9 +135,7 @@ class UsePluginsBlockTest implements RewriteTest {
         );
     }
 
-    /**
-     * `plugins` names a plugin by id; a class reference has none to write.
-     */
+    /// `plugins` names a plugin by id; a class reference has none to write.
     @Test
     void noChangeForClassReference() {
         rewriteRun(

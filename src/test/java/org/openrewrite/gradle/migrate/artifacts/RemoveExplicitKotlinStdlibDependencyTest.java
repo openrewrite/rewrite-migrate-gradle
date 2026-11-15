@@ -107,10 +107,8 @@ class RemoveExplicitKotlinStdlibDependencyTest implements RewriteTest {
         );
     }
 
-    /**
-     * The `kotlin("jvm")` shorthand names no plugin id in the script, so this only resolves through the
-     * `GradleProject` marker, where Gradle has already expanded it to `org.jetbrains.kotlin.jvm`.
-     */
+    /// The `kotlin("jvm")` shorthand names no plugin id in the script, so this only resolves through the
+    /// `GradleProject` marker, where Gradle has already expanded it to `org.jetbrains.kotlin.jvm`.
     @Test
     void removesStdlibWhenPluginAppliedWithKotlinShorthand() {
         rewriteRun(
@@ -146,11 +144,9 @@ class RemoveExplicitKotlinStdlibDependencyTest implements RewriteTest {
         );
     }
 
-    /**
-     * The catalog entry names two spellings, and this is the other one: the Kotlin DSL `kotlin("stdlib")` helper,
-     * which Gradle expands to `org.jetbrains.kotlin:kotlin-stdlib`, so it is the same dependency as the coordinate
-     * form above.
-     */
+    /// The catalog entry names two spellings, and this is the other one: the Kotlin DSL `kotlin("stdlib")` helper,
+    /// which Gradle expands to `org.jetbrains.kotlin:kotlin-stdlib`, so it is the same dependency as the coordinate
+    /// form above.
     @Test
     void removesStdlibDeclaredWithKotlinShorthand() {
         rewriteRun(
@@ -186,11 +182,9 @@ class RemoveExplicitKotlinStdlibDependencyTest implements RewriteTest {
         );
     }
 
-    /**
-     * The Kotlin plugin adds the standard library to `implementation` and nowhere else, so a declaration on a
-     * configuration of the project's own is not redundant â€” removing it would take the standard library off that
-     * configuration with nothing putting it back.
-     */
+    /// The Kotlin plugin adds the standard library to `implementation` and nowhere else, so a declaration on a
+    /// configuration of the project's own is not redundant â€” removing it would take the standard library off that
+    /// configuration with nothing putting it back.
     @Test
     void noChangeToACustomConfiguration() {
         rewriteRun(
@@ -216,10 +210,8 @@ class RemoveExplicitKotlinStdlibDependencyTest implements RewriteTest {
         );
     }
 
-    /**
-     * `api` is consumer-visible: the plugin's own contribution goes to `implementation`, so removing an `api`
-     * declaration would drop the standard library out of the published compile scope for everyone downstream.
-     */
+    /// `api` is consumer-visible: the plugin's own contribution goes to `implementation`, so removing an `api`
+    /// declaration would drop the standard library out of the published compile scope for everyone downstream.
     @Test
     void noChangeToAnApiDeclaration() {
         rewriteRun(
@@ -242,11 +234,9 @@ class RemoveExplicitKotlinStdlibDependencyTest implements RewriteTest {
         );
     }
 
-    /**
-     * The precondition is load-bearing: a project with no Kotlin plugin that depends on the standard library is using
-     * it as an ordinary library, and removing the declaration would stop it compiling. Before `FindPlugins` stopped
-     * treating an unset `pluginClass` as a match for every plugin, this case was removed too.
-     */
+    /// The precondition is load-bearing: a project with no Kotlin plugin that depends on the standard library is using
+    /// it as an ordinary library, and removing the declaration would stop it compiling. Before `FindPlugins` stopped
+    /// treating an unset `pluginClass` as a match for every plugin, this case was removed too.
     @Test
     void noChangeWhenNoKotlinPluginApplied() {
         rewriteRun(

@@ -30,11 +30,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeLoadingTest implements RewriteTest {
 
-    /**
-     * What {@link RewriteTest#assertRecipesConfigure()} does, except that a recipe class left with nothing but
-     * unset required options is not run, since it cannot be until it is configured. Its declarative callers still
-     * are, with the options they pass.
-     */
+    /// What [RewriteTest#assertRecipesConfigure()] does, except that a recipe class left with nothing but
+    /// unset required options is not run, since it cannot be until it is configured. Its declarative callers still
+    /// are, with the options they pass.
     @Test
     void loadRecipeFromFile() {
         String packageName = getClass().getPackage().getName();
@@ -43,7 +41,7 @@ class RecipeLoadingTest implements RewriteTest {
                 .build()
                 .listRecipes();
         assertThat(recipes).as("No recipes found in %s", packageName).isNotEmpty();
-        SoftAssertions softly = new SoftAssertions();
+        var softly = new SoftAssertions();
         for (Recipe recipe : recipes) {
             if (!recipe.getName().startsWith(packageName) || needsOptions(recipe)) {
                 continue;
@@ -55,10 +53,8 @@ class RecipeLoadingTest implements RewriteTest {
         softly.assertAll();
     }
 
-    /**
-     * Never true of a declarative recipe, whose failures include a sub-recipe's missing option, which is a real
-     * mistake in the YAML.
-     */
+    /// Never true of a declarative recipe, whose failures include a sub-recipe's missing option, which is a real
+    /// mistake in the YAML.
     private static boolean needsOptions(Recipe recipe) {
         if (recipe instanceof DeclarativeRecipe) {
             return false;

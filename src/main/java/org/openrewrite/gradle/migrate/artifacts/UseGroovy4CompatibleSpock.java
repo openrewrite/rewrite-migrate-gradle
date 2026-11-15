@@ -169,8 +169,7 @@ public class UseGroovy4CompatibleSpock extends Recipe {
 
     /** Whether the script declares a Groovy of its own, which its Spock variant belongs to and not Gradle's. */
     private static boolean declaresGroovy(JavaSourceFile cu) {
-        Set<String> found = new HashSet<>();
-        new JavaIsoVisitor<Set<String>>() {
+        return !new JavaIsoVisitor<Set<String>>() {
             @Override
             public J.Literal visitLiteral(J.Literal literal, Set<String> declared) {
                 if (literal.getType() == JavaType.Primitive.String && literal.getValue() instanceof String) {
@@ -204,7 +203,6 @@ public class UseGroovy4CompatibleSpock extends Recipe {
                 }
                 return m;
             }
-        }.visit(cu, found);
-        return !found.isEmpty();
+        }.reduce(cu, new HashSet<>()).isEmpty();
     }
 }

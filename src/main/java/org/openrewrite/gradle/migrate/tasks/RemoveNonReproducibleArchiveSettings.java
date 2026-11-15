@@ -15,9 +15,6 @@
  */
 package org.openrewrite.gradle.migrate.tasks;
 
-import java.time.Duration;
-import java.util.HashSet;
-import java.util.Set;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -30,6 +27,10 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+
+import java.time.Duration;
+import java.util.HashSet;
+import java.util.Set;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;

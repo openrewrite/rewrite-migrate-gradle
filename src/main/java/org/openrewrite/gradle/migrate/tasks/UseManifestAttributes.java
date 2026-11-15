@@ -31,14 +31,15 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.util.Collections.singletonList;
 
 /** Uses the merging API; assigning a replacement map is intentionally not equivalent. */
 @Value
@@ -115,7 +116,7 @@ public class UseManifestAttributes extends Recipe {
                 if (prefix.getComments().isEmpty()) {
                     prefix = Space.EMPTY;
                 }
-                return call.withArguments(Collections.singletonList(a.getAssignment().withPrefix(prefix)))
+                return call.withArguments(singletonList(a.getAssignment().withPrefix(prefix)))
                         .withPrefix(a.getPrefix());
             }
 
@@ -184,8 +185,7 @@ public class UseManifestAttributes extends Recipe {
             // Deliberately conservative for sparse models: a declaration of a DSL name anywhere in
             // the script disables the unqualified fallback rather than guessing its dynamic resolution.
             private boolean hasShadows() {
-                AtomicBoolean shadow = new AtomicBoolean();
-                new JavaIsoVisitor<AtomicBoolean>() {
+                return new JavaIsoVisitor<AtomicBoolean>() {
                     private void check(String name, AtomicBoolean found) {
                         if ("attributes".equals(name) || "manifest".equals(name) || "jar".equals(name) ||
                             "allprojects".equals(name) || "subprojects".equals(name)) {
@@ -205,8 +205,7 @@ public class UseManifestAttributes extends Recipe {
                         }
                         return super.visitMethodDeclaration(m, found);
                     }
-                }.visit(getCursor().firstEnclosingOrThrow(G.CompilationUnit.class), shadow);
-                return shadow.get();
+                }.reduce(getCursor().firstEnclosingOrThrow(G.CompilationUnit.class), new AtomicBoolean()).get();
             }
         });
     }

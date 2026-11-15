@@ -15,12 +15,6 @@
  */
 package org.openrewrite.gradle.migrate.artifacts;
 
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -38,6 +32,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
+
+import java.time.Duration;
+import java.util.*;
 
 public class RemoveInheritedDependencies extends Recipe {
 

@@ -290,7 +290,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
         TomlParser parser = TomlParser.builder().build();
         Toml.Document versionCatalog = parser.parse(ctx, tomlContent)
                 .findFirst()
-                .map(sourceFile -> (Toml.Document) sourceFile)
+                .map(Toml.Document.class::cast)
                 .map(doc -> doc.withSourcePath(Paths.get(CATALOG_PATH)))
                 .orElseThrow(() -> new IllegalStateException("Failed to create version catalog file"));
 
@@ -618,7 +618,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
         }
 
         @Override
-        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+        public  J.@Nullable VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
             J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, ctx);
 
             // Check if this is a Kotlin property delegation (val propertyName: String by project)

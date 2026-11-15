@@ -32,10 +32,10 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 
 import java.util.ArrayList;
 import java.util.List;

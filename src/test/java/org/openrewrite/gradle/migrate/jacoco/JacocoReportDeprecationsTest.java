@@ -463,7 +463,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
     @Nested
     class OtherReportingTasks {
         @Test
-        void testTaskInGroovy() {
+        void taskInGroovy() {
             rewriteRun(
               buildGradle(
                 """

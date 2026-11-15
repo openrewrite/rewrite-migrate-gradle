@@ -17,15 +17,14 @@ package org.openrewrite.gradle.migrate.scripts;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static java.util.Collections.singletonList;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.buildGradleKts;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import java.util.List;
+
+import static org.openrewrite.gradle.Assertions.*;
 
 class InlineAppliedScriptTest implements RewriteTest {
 
@@ -70,7 +69,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation 'org.springframework.boot:spring-boot-starter-web'
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle")
           )
         );
@@ -121,7 +120,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation "com.google.guava:guava:$guavaVersion"
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle")
           )
         );
@@ -162,7 +161,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation "org.example:built:${LocalDate.now().year}"
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle")
           )
         );
@@ -199,7 +198,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   mavenCentral()
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("gradle/repositories.gradle")
           ),
           buildGradle(
@@ -208,14 +207,14 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation 'org.slf4j:slf4j-api:2.0.13'
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("app/dependencies.gradle")
           ),
           buildGradle(
             """
               ext.junitVersion = '5.10.2'
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("gradle/versions.gradle")
           )
         );
@@ -242,14 +241,14 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation "org.slf4j:slf4j-api:$slf4jVersion"
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle")
           ),
           buildGradle(
             """
               ext.slf4jVersion = '2.0.13'
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("gradle/versions.gradle")
           )
         );
@@ -417,7 +416,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   }
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle")
           )
         );
@@ -507,7 +506,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   "implementation"("org.slf4j:slf4j-api:2.0.13")
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle.kts")
           )
         );
@@ -553,7 +552,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   mavenCentral()
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("repositories.gradle")
           ),
           buildGradle(
@@ -562,7 +561,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation 'org.slf4j:slf4j-api:2.0.13'
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle")
           ),
           buildGradle(
@@ -596,7 +595,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation 'org.slf4j:slf4j-api:2.0.13'
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle")
           )
         );
@@ -624,7 +623,7 @@ class InlineAppliedScriptTest implements RewriteTest {
             spec -> spec.path("app/build.gradle").markers(GradleProject.builder()
               .name("app")
               .path(":app")
-              .plugins(singletonList(new GradlePluginDescriptor("com.example.DependenciesPlugin", "com.example.dependencies")))
+              .plugins(List.of(new GradlePluginDescriptor("com.example.DependenciesPlugin", "com.example.dependencies")))
               .build())
           ),
           buildGradle(
@@ -633,7 +632,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation 'org.slf4j:slf4j-api:2.0.13'
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("app/dependencies.gradle")
           )
         );
@@ -675,7 +674,7 @@ class InlineAppliedScriptTest implements RewriteTest {
             """
               apply plugin: 'maven-publish'
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("publishing.gradle")
           ),
           buildGradle(
@@ -684,7 +683,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation 'org.slf4j:slf4j-api:2.0.13'
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle")
           )
         );
@@ -746,7 +745,7 @@ class InlineAppliedScriptTest implements RewriteTest {
                   "implementation"("org.slf4j:slf4j-api:2.0.13")
               }
               """,
-            null,
+            doesNotExist(),
             spec -> spec.path("dependencies.gradle.kts")
           )
         );

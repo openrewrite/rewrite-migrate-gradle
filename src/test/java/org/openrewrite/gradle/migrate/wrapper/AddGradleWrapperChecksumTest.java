@@ -34,9 +34,7 @@ class AddGradleWrapperChecksumTest implements RewriteTest {
 
     private static final String WRAPPER_PROPERTIES = "gradle/wrapper/gradle-wrapper.properties";
 
-    /**
-     * Not the real published sum; only the stub below serves it.
-     */
+    /// Not the real published sum; only the stub below serves it.
     private static final String SHA_8_14 = "1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a";
 
     @Override
@@ -119,15 +117,13 @@ class AddGradleWrapperChecksumTest implements RewriteTest {
         );
     }
 
-    /**
-     * `services.gradle.org` answers the checksum URL with a 301 to `downloads.gradle.org`, and
-     * {@link org.openrewrite.Checksum#fromUri} treats any non-2xx as a failure, so a client that did not follow
-     * the redirect would silently leave every wrapper untouched. Stubbing the redirect would only prove the stub
-     * follows it, so this one goes over the network.
-     */
+    /// `services.gradle.org` answers the checksum URL with a 301 to `downloads.gradle.org`, and
+    /// [org.openrewrite.Checksum#fromUri] treats any non-2xx as a failure, so a client that did not follow
+    /// the redirect would silently leave every wrapper untouched. Stubbing the redirect would only prove the stub
+    /// follows it, so this one goes over the network.
     @Test
     void followsTheRedirectToTheDownloadsHost() {
-        HttpUrlConnectionSender sender = new HttpUrlConnectionSender(Duration.ofSeconds(30), Duration.ofMinutes(1));
+        var sender = new HttpUrlConnectionSender(Duration.ofSeconds(30), Duration.ofMinutes(1));
         rewriteRun(
           spec -> spec.executionContext(HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
             .setHttpSender(sender)

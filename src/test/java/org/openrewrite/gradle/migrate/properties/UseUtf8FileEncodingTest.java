@@ -59,9 +59,7 @@ class UseUtf8FileEncodingTest implements RewriteTest {
         );
     }
 
-    /**
-     * A second `-Dfile.encoding` would quietly win over the one already chosen.
-     */
+    /// A second `-Dfile.encoding` would quietly win over the one already chosen.
     @Test
     void noChangeWhenADifferentEncodingIsSet() {
         rewriteRun(
@@ -74,10 +72,8 @@ class UseUtf8FileEncodingTest implements RewriteTest {
         );
     }
 
-    /**
-     * Setting `org.gradle.jvmargs` replaces Gradle's default daemon arguments rather than adding to them, so
-     * creating it here would drop the default heap and metaspace settings.
-     */
+    /// Setting `org.gradle.jvmargs` replaces Gradle's default daemon arguments rather than adding to them, so
+    /// creating it here would drop the default heap and metaspace settings.
     @Test
     void noChangeWhenJvmArgsAbsent() {
         rewriteRun(

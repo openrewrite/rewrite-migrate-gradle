@@ -593,7 +593,7 @@ class MigratePluginPublishPluginTest implements RewriteTest {
             })),
           properties(
             "implementation-class=com.acme.WidgetPlugin\n",
-            null,
+            doesNotExist(),
             spec -> spec.path("src/main/resources/META-INF/gradle-plugins/com.acme.widget.properties")
           ),
           buildGradle(
@@ -654,7 +654,7 @@ class MigratePluginPublishPluginTest implements RewriteTest {
             })),
           properties(
             "implementation-class=com.acme.WidgetPlugin\n",
-            null,
+            doesNotExist(),
             spec -> spec.path("src/main/resources/META-INF/gradle-plugins/com.acme.widget.properties")
           ),
           buildGradle(

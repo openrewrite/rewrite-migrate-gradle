@@ -50,8 +50,8 @@ public class AddToolingParallelProperty extends Recipe {
                 // Core's org.openrewrite.gradle.AddProperty generates a gradle.properties when there is none;
                 // this one only ever edits the file it is given.
                 return needsToolingParallel(file) ?
-                        new AddProperty(TOOLING_PARALLEL, "true", null, null, null, AddProperty.InsertMode.After, PARALLEL)
-                                .getVisitor().visitFile(file, ctx) :
+                        (Properties.File) new AddProperty(TOOLING_PARALLEL, "true", null, null, null, AddProperty.InsertMode.After, PARALLEL)
+                                .getVisitor().visit(file, ctx, getCursor().getParentTreeCursor()) :
                         file;
             }
         });

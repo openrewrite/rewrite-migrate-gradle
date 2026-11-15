@@ -38,15 +38,11 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
+import static java.util.Collections.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -67,7 +63,7 @@ public class JacocoReportDeprecations extends Recipe {
         renames.put("setEnabled", "required");
         renames.put("destination", "outputLocation");
         renames.put("setDestination", "outputLocation");
-        RENAMES = Collections.unmodifiableMap(renames);
+        RENAMES = unmodifiableMap(renames);
 
         Map<String, String> types = new HashMap<>();
         types.put("Checkstyle", "org.gradle.api.plugins.quality.Checkstyle");
@@ -76,7 +72,7 @@ public class JacocoReportDeprecations extends Recipe {
         types.put("Pmd", "org.gradle.api.plugins.quality.Pmd");
         types.put("SpotBugsTask", "com.github.spotbugs.snom.SpotBugsTask");
         types.put("Test", "org.gradle.api.tasks.testing.Test");
-        REPORTING_TASK_TYPES = Collections.unmodifiableMap(types);
+        REPORTING_TASK_TYPES = unmodifiableMap(types);
     }
 
     String displayName = "Use `required` and `outputLocation` on task reports";
@@ -258,11 +254,11 @@ public class JacocoReportDeprecations extends Recipe {
      * `outputLocation` rejects a String on Gradle 8.14.4 and accepts it on 9.8.2; a File works on both.
      */
     private static Expression value(String property, Expression value) {
-        if (RENAMES.get(property).equals("outputLocation") &&
+        if ("outputLocation".equals(RENAMES.get(property)) &&
             (value instanceof G.GString || value instanceof J.Literal && ((J.Literal) value).getValue() instanceof String)) {
             J.Identifier file = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "file", null, null);
             return new J.MethodInvocation(Tree.randomId(), value.getPrefix(), Markers.EMPTY, null, null, file,
-                    JContainer.build(Space.EMPTY, Collections.singletonList(JRightPadded.build(asArgument(value))), Markers.EMPTY),
+                    JContainer.build(Space.EMPTY, singletonList(JRightPadded.build(asArgument(value))), Markers.EMPTY),
                     null);
         }
         return value;

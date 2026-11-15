@@ -355,10 +355,8 @@ class MigrateDependenciesToVersionCatalogKotlinDSLTest implements RewriteTest {
         );
     }
 
-    /**
-     * When a version catalog already exists, the recipe will not modify it.
-     * This is the current behavior - merging is not yet implemented.
-     */
+    /// When a version catalog already exists, the recipe will not modify it.
+    /// This is the current behavior - merging is not yet implemented.
     @Test
     void whenVersionCatalogAlreadyExists() {
         rewriteRun(

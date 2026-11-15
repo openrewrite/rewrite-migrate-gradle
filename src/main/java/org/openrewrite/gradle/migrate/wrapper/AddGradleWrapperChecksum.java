@@ -82,7 +82,7 @@ public class AddGradleWrapperChecksum extends Recipe {
 
                 // Insert after distributionUrl rather than alphabetically, so the layout matches what
                 // UpdateGradleWrapper.generate() writes and the two recipes cannot disagree about one file.
-                return (Properties) AddProperty.builder()
+                return AddProperty.builder()
                         .property(DISTRIBUTION_SHA_256_SUM_KEY)
                         .value(checksum)
                         .insertMode(AddProperty.InsertMode.After)

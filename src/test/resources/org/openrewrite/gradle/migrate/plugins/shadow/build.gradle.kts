@@ -3,7 +3,7 @@ import java.util.*
 
 plugins {
     java
-    id("com.github.johnrengelman.shadow") version "6.1.0"
+    id("com.gradleup.shadow") version "9.0.0"
 }
 
 group = "com.graphql-java"
@@ -30,7 +30,7 @@ version = version()
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(11))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 

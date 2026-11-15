@@ -114,17 +114,15 @@ public class UseWithPluginInsteadOfHasPlugin extends Recipe {
             }
 
             private boolean isSafeToDefer(J.Block thenBlock) {
-                Set<String> scriptVariables = new HashSet<>();
-                new JavaIsoVisitor<Set<String>>() {
+                Set<String> scriptVariables = new JavaIsoVisitor<Set<String>>() {
                     @Override
                     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Set<String> names) {
                         names.add(variable.getSimpleName());
                         return super.visitVariable(variable, names);
                     }
-                }.visit(getCursor().firstEnclosingOrThrow(JavaSourceFile.class), scriptVariables);
+                }.reduce(getCursor().firstEnclosingOrThrow(JavaSourceFile.class), new HashSet<>());
 
-                AtomicBoolean unsafe = new AtomicBoolean();
-                new JavaIsoVisitor<AtomicBoolean>() {
+                return !new JavaIsoVisitor<AtomicBoolean>() {
                     int lambdaDepth;
                     int loopDepth;
 
@@ -247,8 +245,7 @@ public class UseWithPluginInsteadOfHasPlugin extends Recipe {
                         return variable instanceof J.Identifier &&
                                scriptVariables.contains(((J.Identifier) variable).getSimpleName());
                     }
-                }.visit(thenBlock, unsafe, getCursor());
-                return !unsafe.get();
+                }.reduce(thenBlock, new AtomicBoolean(), getCursor()).get();
             }
         });
     }

@@ -21,19 +21,22 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.buildGradleKts;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 
 class FindGradleUpgradeBlockersTest {
 
     @Nested
     class Composite implements RewriteTest {
+
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.recipeFromResources("org.openrewrite.gradle.migrate.search.FindGradleUpgradeBlockers");
+        }
+
         @DocumentExample
         @Test
         void marksEachWithoutChangingCode() {
             rewriteRun(
-              spec -> spec.recipeFromResources("org.openrewrite.gradle.migrate.search.FindGradleUpgradeBlockers"),
               buildGradle(
                 """
                   plugins {
@@ -68,7 +71,6 @@ class FindGradleUpgradeBlockersTest {
         @Test
         void leavesCleanBuildAlone() {
             rewriteRun(
-              spec -> spec.recipeFromResources("org.openrewrite.gradle.migrate.search.FindGradleUpgradeBlockers"),
               buildGradle(
                 """
                   plugins {

@@ -27,14 +27,12 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
-
 import org.openrewrite.properties.tree.Properties;
 
 import java.nio.file.Path;
@@ -48,9 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -117,6 +113,7 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
         /** The script's own directory, so a sibling module's descriptor is not taken for this one. */
         @Nullable
         Path dir;
+
         /** The id of each plugin the script has to declare itself, by declaration name. */
         Map<String, String> idsToDeclare;
         /** The implementation class the script already declares for an id, which makes a descriptor redundant. */

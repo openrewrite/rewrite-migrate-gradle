@@ -30,16 +30,16 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -124,7 +124,7 @@ public class ReplaceBuiltInWrapperTask extends Recipe {
                 J.MethodInvocation configured = configureWrapper(m, tasks, (J.Lambda) arguments.get(1));
                 // Kotlin prints `tasks.wrapper() { }` unless told that nothing precedes the trailing lambda
                 return configured.getPadding().withArguments(configured.getPadding().getArguments()
-                        .withMarkers(Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))));
+                        .withMarkers(Markers.build(singletonList(new OmitParentheses(Tree.randomId())))));
             }
 
             private J.MethodInvocation configureWrapper(J.MethodInvocation m, J.@Nullable Identifier select, J.Lambda closure) {
@@ -132,7 +132,7 @@ public class ReplaceBuiltInWrapperTask extends Recipe {
                         .withMethodType(null)
                         .getPadding().withSelect(select == null ? null : JRightPadded.build(select))
                         .getPadding().withTypeParameters(null)
-                        .withArguments(Collections.singletonList(closure));
+                        .withArguments(singletonList(closure));
             }
 
             private boolean isContainerDeclaration(J.MethodInvocation m) {

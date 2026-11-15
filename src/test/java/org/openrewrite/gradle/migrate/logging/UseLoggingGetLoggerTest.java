@@ -91,11 +91,9 @@ class UseLoggingGetLoggerTest implements RewriteTest {
         );
     }
 
-    /**
-     * The guard is that the enclosing class is a `Plugin`; build logic that is not one belongs to other catalog
-     * entries. Written as a plain class because `DefaultTask`'s inherited members do not resolve with only
-     * `gradle-api` on the parser classpath.
-     */
+    /// The guard is that the enclosing class is a `Plugin`; build logic that is not one belongs to other catalog
+    /// entries. Written as a plain class because `DefaultTask`'s inherited members do not resolve with only
+    /// `gradle-api` on the parser classpath.
     @Test
     void noChangeOutsideAPlugin() {
         rewriteRun(
@@ -114,9 +112,7 @@ class UseLoggingGetLoggerTest implements RewriteTest {
         );
     }
 
-    /**
-     * Adding a second field of this name would not compile, so the class is left alone entirely.
-     */
+    /// Adding a second field of this name would not compile, so the class is left alone entirely.
     @Test
     void noChangeWhenANonLoggerFieldTakesTheName() {
         rewriteRun(

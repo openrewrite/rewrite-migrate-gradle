@@ -34,10 +34,8 @@ class AddRootProjectNameTest implements RewriteTest {
         spec.recipe(new AddRootProjectName(null));
     }
 
-    /**
-     * The name is Gradle's own, read from the `GradleProject` marker, so writing it changes nothing about how the
-     * build resolves â€” it pins what the directory name was already supplying.
-     */
+    /// The name is Gradle's own, read from the `GradleProject` marker, so writing it changes nothing about how the
+    /// build resolves â€” it pins what the directory name was already supplying.
     private static Consumer<SourceSpec<G.CompilationUnit>> named(String name) {
         return spec -> spec.markers(GradleProject.builder()
                 .name(name)
@@ -159,10 +157,8 @@ class AddRootProjectNameTest implements RewriteTest {
         );
     }
 
-    /**
-     * Without the marker there is no way to know the name Gradle is inferring, and guessing one would rename the
-     * project rather than pin it.
-     */
+    /// Without the marker there is no way to know the name Gradle is inferring, and guessing one would rename the
+    /// project rather than pin it.
     @Test
     void noChangeWhenNameIsUnknown() {
         rewriteRun(
@@ -188,7 +184,7 @@ class AddRootProjectNameTest implements RewriteTest {
         rewriteRun(
           buildGradle("plugins { id 'java' }", named("my-service")),
           settingsGradle(
-            null,
+            doesNotExist(),
             """
               rootProject.name = 'my-service'
               """

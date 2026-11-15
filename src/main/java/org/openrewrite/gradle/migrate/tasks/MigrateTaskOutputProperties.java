@@ -38,12 +38,10 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -56,21 +54,21 @@ public class MigrateTaskOutputProperties extends Recipe {
 
     private static final Map<String, String> TEST_TYPES;
     private static final Map<String, String> TEST_REPORT_TYPES =
-            Collections.singletonMap("TestReport", "org.gradle.api.tasks.testing.TestReport");
+            singletonMap("TestReport", "org.gradle.api.tasks.testing.TestReport");
     private static final Map<String, String> REPLACEMENTS;
 
     static {
         Map<String, String> testTypes = new HashMap<>();
         testTypes.put("AbstractTestTask", "org.gradle.api.tasks.testing.AbstractTestTask");
         testTypes.put("Test", "org.gradle.api.tasks.testing.Test");
-        TEST_TYPES = Collections.unmodifiableMap(testTypes);
+        TEST_TYPES = unmodifiableMap(testTypes);
 
         Map<String, String> replacements = new HashMap<>();
         replacements.put(REPORTS_DIR, "reportsDirectory");
         replacements.put(BIN_RESULTS_DIR, "binaryResultsDirectory");
         replacements.put(DESTINATION_DIR, "destinationDirectory");
         replacements.put(TEST_RESULT_DIRS, "testResults");
-        REPLACEMENTS = Collections.unmodifiableMap(replacements);
+        REPLACEMENTS = unmodifiableMap(replacements);
     }
 
     String displayName = "Migrate removed test and JaCoCo output properties";

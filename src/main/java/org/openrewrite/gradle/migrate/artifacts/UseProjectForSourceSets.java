@@ -31,16 +31,17 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.util.Collections.*;
 
 /** ProjectDependency no longer delegates Project properties in Gradle 9. */
 @Value
@@ -96,12 +97,12 @@ public class UseProjectForSourceSets extends Recipe {
                         J.Literal literal = (J.Literal) project.getArguments().get(0);
                         dependency = dependency.withArguments(ListUtils.mapFirst(dependency.getArguments(), arg ->
                                 path.withValue(literal.withId(Tree.randomId()).withPrefix(Space.SINGLE_SPACE))));
-                        dependency = dependency.withPrefix(runtime.getPrefix().withComments(Collections.emptyList())).withMarkers(runtime.getMarkers());
-                        J.MethodInvocation graph = call.withArguments(Collections.singletonList(dependency));
+                        dependency = dependency.withPrefix(runtime.getPrefix().withComments(emptyList())).withMarkers(runtime.getMarkers());
+                        J.MethodInvocation graph = call.withArguments(singletonList(dependency));
                         J.FieldAccess output = runtime.withName(runtime.getName().withSimpleName("output").withFieldType(null))
                                 .withType(JavaType.ShallowClass.build("org.gradle.api.tasks.SourceSetOutput"));
                         J.MethodInvocation files = call.withId(Tree.randomId()).withName(call.getName().withId(Tree.randomId()))
-                                .withArguments(Collections.singletonList(output));
+                                .withArguments(singletonList(output));
                         Space firstPrefix = statement.getPrefix();
                         String whitespace = firstPrefix.getLastWhitespace();
                         if (!whitespace.contains("\n")) {
@@ -115,7 +116,7 @@ public class UseProjectForSourceSets extends Recipe {
                             String indent = owner.getValue() instanceof J ? ((J) owner.getValue()).getPrefix().getIndent() : "";
                             whitespace = "\n" + indent + "    ";
                         }
-                        Space nextPrefix = Space.build(whitespace, Collections.emptyList());
+                        Space nextPrefix = Space.build(whitespace, emptyList());
                         Statement second = statement instanceof J.Return ?
                                 ((J.Return) statement).withPrefix(nextPrefix).withExpression(files) : files.withPrefix(nextPrefix);
                         return Arrays.asList(graph.withPrefix(firstPrefix), second);
@@ -178,7 +179,7 @@ public class UseProjectForSourceSets extends Recipe {
                 }
                 JavaType.FullyQualified projectType = JavaType.ShallowClass.build("org.gradle.api.Project");
                 J.Identifier root = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                        java.util.Collections.emptyList(), "rootProject", projectType, null);
+                        emptyList(), "rootProject", projectType, null);
                 return f.withTarget(project.withSelect(root).withMethodType(method == null ? null :
                         method.withDeclaringType(projectType).withReturnType(projectType)));
             }
@@ -255,7 +256,7 @@ public class UseProjectForSourceSets extends Recipe {
                 Set<String> names = new HashSet<>(Arrays.asList("project", "rootProject", "dependencies",
                         "subprojects", "allprojects", "configure", "getProject", "getRootProject",
                         "getDependencies", "getSubprojects", "getAllprojects"));
-                Collections.addAll(names, additionalNames);
+                addAll(names, additionalNames);
                 Cursor c = getCursor();
                 while (c != null) {
                     Object scope = c.getValue();

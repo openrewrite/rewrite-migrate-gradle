@@ -26,7 +26,8 @@ project(':core') {
 configure(subprojects.findAll { it.name != 'core' }) {
     dependencies {
         compileOnly project(':core')
-        compileOnly project(':core').sourceSets.main.runtimeClasspath
+        compileOnly project(path: ':core', configuration: 'runtimeElements')
+        compileOnly rootProject.project(':core').sourceSets.main.output
         compileOnly 'org.apache.commons:commons-lang3:3.17.0'
     }
     tasks.register('verifyRuntimeView') {

@@ -36,8 +36,8 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.KotlinTemplate;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Marker;
 
 import java.util.Arrays;
 import java.util.HashSet;

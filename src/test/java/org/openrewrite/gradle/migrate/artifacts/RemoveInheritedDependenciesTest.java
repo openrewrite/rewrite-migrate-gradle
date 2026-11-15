@@ -31,9 +31,7 @@ class RemoveInheritedDependenciesTest implements RewriteTest {
                 .recipe(new RemoveInheritedDependencies());
     }
 
-    /**
-     * `testImplementation` extends `implementation`, so the test configuration already has the dependency.
-     */
+    /// `testImplementation` extends `implementation`, so the test configuration already has the dependency.
     @DocumentExample("Drop a test declaration the main one already supplies")
     @Test
     void removesTestImplementationAlreadyOnImplementation() {
@@ -70,10 +68,8 @@ class RemoveInheritedDependenciesTest implements RewriteTest {
         );
     }
 
-    /**
-     * In `java-library` `implementation` extends `api`, so the `api` declaration is the one that reaches further and
-     * the `implementation` one adds nothing.
-     */
+    /// In `java-library` `implementation` extends `api`, so the `api` declaration is the one that reaches further and
+    /// the `implementation` one adds nothing.
     @Test
     void keepsTheWiderApiDeclaration() {
         rewriteRun(
@@ -109,10 +105,8 @@ class RemoveInheritedDependenciesTest implements RewriteTest {
         );
     }
 
-    /**
-     * Removing the narrower declaration would change which version resolves, which is a different change than
-     * removing a redundant one.
-     */
+    /// Removing the narrower declaration would change which version resolves, which is a different change than
+    /// removing a redundant one.
     @Test
     void noChangeWhenVersionsDiffer() {
         rewriteRun(
@@ -135,10 +129,8 @@ class RemoveInheritedDependenciesTest implements RewriteTest {
         );
     }
 
-    /**
-     * `compileOnly` does not extend `implementation`; a dependency wanted at compile time only and also at runtime is
-     * two separate intentions, not a duplicate.
-     */
+    /// `compileOnly` does not extend `implementation`; a dependency wanted at compile time only and also at runtime is
+    /// two separate intentions, not a duplicate.
     @Test
     void noChangeForUnrelatedConfigurations() {
         rewriteRun(

@@ -110,10 +110,8 @@ class MoveRepositoriesToSettingsTest implements RewriteTest {
         );
     }
 
-    /**
-     * With more than one project the repositories of each are not interchangeable: hoisting one project's into
-     * settings applies it to all of them, which can change which repository a coordinate resolves from.
-     */
+    /// With more than one project the repositories of each are not interchangeable: hoisting one project's into
+    /// settings applies it to all of them, which can change which repository a coordinate resolves from.
     @Test
     void noChangeInAMultiProjectBuild() {
         rewriteRun(
@@ -155,10 +153,8 @@ class MoveRepositoriesToSettingsTest implements RewriteTest {
         );
     }
 
-    /**
-     * A `buildscript` block's repositories resolve the build's own classpath, not the project's dependencies, and
-     * `dependencyResolutionManagement` does not serve them.
-     */
+    /// A `buildscript` block's repositories resolve the build's own classpath, not the project's dependencies, and
+    /// `dependencyResolutionManagement` does not serve them.
     @Test
     void noChangeToBuildscriptRepositories() {
         rewriteRun(
@@ -179,9 +175,7 @@ class MoveRepositoriesToSettingsTest implements RewriteTest {
         );
     }
 
-    /**
-     * Repositories inside `publishing` are where artifacts go, not where dependencies come from.
-     */
+    /// Repositories inside `publishing` are where artifacts go, not where dependencies come from.
     @Test
     void noChangeToPublishingRepositories() {
         rewriteRun(
@@ -208,10 +202,8 @@ class MoveRepositoriesToSettingsTest implements RewriteTest {
         );
     }
 
-    /**
-     * A `repositories` block inside `allprojects` is multi-project configuration by nature, even when the build
-     * happens to have one project today.
-     */
+    /// A `repositories` block inside `allprojects` is multi-project configuration by nature, even when the build
+    /// happens to have one project today.
     @Test
     void noChangeToAllprojectsRepositories() {
         rewriteRun(

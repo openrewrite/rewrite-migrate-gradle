@@ -67,10 +67,8 @@ class RemoveNonReproducibleArchiveSettingsTest implements RewriteTest {
         );
     }
 
-    /**
-     * Only the override that defeats reproducibility is removed; a value written explicitly to agree with the
-     * default is left alone.
-     */
+    /// Only the override that defeats reproducibility is removed; a value written explicitly to agree with the
+    /// default is left alone.
     @Test
     void noChangeWhenAlreadySetReproducibly() {
         rewriteRun(

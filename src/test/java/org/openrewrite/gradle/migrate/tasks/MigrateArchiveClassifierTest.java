@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.migrate.tasks;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.J;
@@ -30,6 +31,7 @@ class MigrateArchiveClassifierTest implements RewriteTest {
         spec.recipe(new MigrateArchiveClassifier());
     }
 
+    @DocumentExample
     @Test
     void interlokSixSites() {
         rewriteRun(buildGradle(

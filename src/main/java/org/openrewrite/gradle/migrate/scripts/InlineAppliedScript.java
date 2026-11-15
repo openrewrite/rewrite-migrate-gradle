@@ -33,9 +33,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -551,7 +549,7 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                 return false;
             }
         }
-        return Collections.disjoint(names, script.getDeclaredNames());
+        return disjoint(names, script.getDeclaredNames());
     }
 
     /**

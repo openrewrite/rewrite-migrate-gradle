@@ -16,8 +16,10 @@
 package org.openrewrite.gradle.migrate.tasks;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
@@ -27,6 +29,7 @@ class UseManifestAttributesTest implements RewriteTest {
         spec.recipe(new UseManifestAttributes());
     }
 
+    @DocumentExample
     @Test
     void neptus() {
         rewriteRun(buildGradle(
@@ -170,28 +173,28 @@ class UseManifestAttributesTest implements RewriteTest {
             """
             def project(String path, Closure c) { c() }
             project(':core') { jar { manifest { attributes += ['custom': 'value'] } } }
-            """), buildGradle(
+            """ ), buildGradle(
             """
             def jar(Closure c) { c() }
             jar { manifest { attributes += ['custom': 'value'] } }
-            """), buildGradle(
+            """ ), buildGradle(
             """
             def result = jar { manifest { attributes += ['observed': 'value'] } }
-            """), buildGradle(
+            """ ), buildGradle(
             """
             jar { manifest { attributes += 'not a map' } }
-            """), buildGradle(
+            """ ), buildGradle(
             """
             jar { manifest { other.attributes += ['untyped receiver': 'value'] } }
-            """), buildGradle(
+            """ ), buildGradle(
             """
             def work() {
                 jar { manifest { attributes += ['method': 'value'] } }
             }
-            """), buildGradle(
+            """ ), buildGradle(
             """
             jar { manifest { def attributes = [:]; attributes += ['local': 'value'] } }
-            """));
+            """ ));
     }
 
     @Test
@@ -211,16 +214,16 @@ class UseManifestAttributesTest implements RewriteTest {
                     return attributes += ['returned': 'value']
                 }
             }
-            """), buildGradle(
+            """ ), buildGradle(
             """
             def manifest(Closure c) { c() }
             jar { manifest { attributes += ['custom': 'value'] } }
-            """), buildGradle(
+            """ ), buildGradle(
             """
             jar { manifest { attributes -> attributes += ['parameter': 'value'] } }
-            """), buildGradleKts(
+            """ ), buildGradleKts(
             """
             tasks.jar { manifest { attributes += mapOf("Main-Class" to "Main") } }
-            """));
+            """ ));
     }
 }

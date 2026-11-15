@@ -23,9 +23,8 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
@@ -132,7 +131,7 @@ class UseSourceSetDependencyConfigurationsTest implements RewriteTest {
     }
 
     @Test
-    void testSuite() {
+    void suite() {
         rewriteRun(
           buildGradle(
             """
@@ -423,13 +422,13 @@ class UseSourceSetDependencyConfigurationsTest implements RewriteTest {
     }
 
     private static GradleProject gradleProject(String... configurations) {
-        Map<String, GradleDependencyConfiguration> nameToConfiguration = new HashMap<>();
+        var nameToConfiguration = new HashMap<String, GradleDependencyConfiguration>();
         for (String configuration : configurations) {
             nameToConfiguration.put(configuration, GradleDependencyConfiguration.builder()
               .name(configuration)
-              .extendsFrom(emptyList())
-              .requested(emptyList())
-              .directResolved(emptyList())
+              .extendsFrom(List.of())
+              .requested(List.of())
+              .directResolved(List.of())
               .build());
         }
         return GradleProject.builder().name("p").path(":").nameToConfiguration(nameToConfiguration).build();

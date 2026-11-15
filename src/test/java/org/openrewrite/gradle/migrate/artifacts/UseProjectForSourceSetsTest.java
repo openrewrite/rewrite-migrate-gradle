@@ -16,14 +16,15 @@
 package org.openrewrite.gradle.migrate.artifacts;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
@@ -33,6 +34,7 @@ class UseProjectForSourceSetsTest implements RewriteTest {
         spec.recipe(new UseProjectForSourceSets());
     }
 
+    @DocumentExample
     @Test
     void neptusShape() {
         rewriteRun(buildGradle(
@@ -205,13 +207,15 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void kotlinUnchanged() {
-        rewriteRun(buildGradleKts("""
+        rewriteRun(buildGradleKts(
+            """
             dependencies { compileOnly(project(":core").sourceSets.main.runtimeClasspath) }
             """));
     }
     @Test
     void customTypedMethods() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             class Custom {
                 Object project(String path) { [sourceSets: [:]] }
                 void dependencies(Closure c) { c() }
@@ -223,7 +227,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void extraPropertyShadow() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             ext.project = { path -> [sourceSets: [:]] }
             dependencies { println project(':core').sourceSets }
             """));
@@ -231,7 +236,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void extraPropertiesBlockShadow() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             ext { project = { path -> [sourceSets: [:]] } }
             dependencies { println project(':core').sourceSets }
             """));
@@ -239,7 +245,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void dependenciesClosureVariableShadow() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             def dependencies = { Closure c -> c() }
             dependencies { println project(':core').sourceSets }
             """));
@@ -247,7 +254,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void wrapperMethodShadow() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             def subprojects(Closure c) { c() }
             subprojects { dependencies { println project(':core').sourceSets } }
             """));
@@ -255,7 +263,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void localRootProjectShadow() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             subprojects {
                 def rootProject = new Object()
                 dependencies { println project(':core').sourceSets }
@@ -289,7 +298,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void configureCustomCollection() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             configure(custom.findAll { it.enabled }) {
                 dependencies { println project(':core').sourceSets }
             }
@@ -298,7 +308,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void configureMethodShadow() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             def configure(Object objects, Closure c) { c() }
             configure(subprojects.findAll { it.name != 'core' }) {
                 dependencies { println project(':core').sourceSets }
@@ -308,7 +319,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void sourceSetsWritesUnchanged() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             dependencies {
                 project(':core').sourceSets = [:]
                 project(':core').sourceSets += [:]
@@ -318,20 +330,22 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void getterShadow() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             def getRootProject() { new Object() }
             dependencies { println project(':core').sourceSets }
             """));
     }
 
     @Test
-    void twoProjectFixture() throws IOException {
+    void twoProjectFixture() throws Exception {
         try (var input = getClass().getResourceAsStream("/org/openrewrite/gradle/migrate/artifacts/project-source-sets/build.gradle")) {
             assert input != null;
-            String before = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            var before = new String(input.readAllBytes(), StandardCharsets.UTF_8);
             rewriteRun(buildGradle(before, before.replace("compileOnly project(':core').sourceSets.main.runtimeClasspath",
-                    "compileOnly project(path: ':core', configuration: 'runtimeElements')\n" +
-                    "        compileOnly rootProject.project(':core').sourceSets.main.output")));
+                    """
+                    compileOnly project(path: ':core', configuration: 'runtimeElements')
+                            compileOnly rootProject.project(':core').sourceSets.main.output""")));
         }
     }
 
@@ -392,7 +406,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void explicitAndDeclarativeViewsUnchanged() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             dependencies {
                 compileOnly rootProject.project(':core').sourceSets.main.runtimeClasspath
                 compileOnly project(path: ':core', configuration: 'runtimeElements')
@@ -429,7 +444,7 @@ class UseProjectForSourceSetsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<java.util.Set<java.util.UUID>>() {
                 @Override
                 public J preVisit(J tree, java.util.Set<java.util.UUID> ids) {
-                    org.junit.jupiter.api.Assertions.assertTrue(ids.add(tree.getId()), "duplicate tree id: " + tree.getId());
+                    assertThat(ids.add(tree.getId())).as("duplicate tree id: " + tree.getId()).isTrue();
                     return tree;
                 }
             }.visit(cu, new java.util.HashSet<>()))));
@@ -437,7 +452,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void unsupportedResolvingViewsRemainUnchanged() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             dependencies {
                 compileOnly((project(':core').sourceSets.main).runtimeClasspath)
                 compileOnly project(':core').sourceSets.main.getRuntimeClasspath()
@@ -447,7 +463,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
 
     @Test
     void variantDoesNotOverrideExtraCompileOnlyShadow() {
-        rewriteRun(buildGradle("""
+        rewriteRun(buildGradle(
+            """
             ext.compileOnly = { value -> println value }
             dependencies { compileOnly project(':core').sourceSets.main.runtimeClasspath }
             """));

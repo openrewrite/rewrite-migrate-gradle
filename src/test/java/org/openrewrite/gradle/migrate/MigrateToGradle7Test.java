@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.migrate;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -30,6 +31,7 @@ class MigrateToGradle7Test implements RewriteTest {
           .allSources(source -> source.markers(GradleProject.builder().name("example").path(":").build()));
     }
 
+    @DocumentExample
     @Test
     void allowInsecureProtocolForMigratedDeployerRepository() {
         rewriteRun(

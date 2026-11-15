@@ -16,17 +16,15 @@
 package org.openrewrite.gradle.migrate.plugins;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.buildGradleKts;
-import static org.openrewrite.gradle.Assertions.settingsGradleKts;
+import static org.openrewrite.gradle.Assertions.*;
 
 class UpgradeShadowPluginTest implements RewriteTest {
     @Override
@@ -34,8 +32,9 @@ class UpgradeShadowPluginTest implements RewriteTest {
         spec.recipe(new UpgradeShadowPlugin());
     }
 
+    @DocumentExample
     @Test
-    void originalGraphqlAnonymizerBuildScript() throws IOException {
+    void originalGraphqlAnonymizerBuildScript() throws Exception {
         String original;
         try (InputStream in = requireNonNull(getClass().getResourceAsStream("/org/openrewrite/gradle/migrate/plugins/shadow/build.gradle.kts"))) {
             original = new String(in.readAllBytes(), StandardCharsets.UTF_8);

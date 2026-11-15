@@ -25,9 +25,9 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.gradle.Assertions.buildGradle;
@@ -45,9 +45,9 @@ class DependencyUseStringNotationTest implements RewriteTest {
             GradleDependencyConfiguration.builder()
               .name(name)
               .isCanBeDeclared(true)
-              .extendsFrom(emptyList())
-              .requested(emptyList())
-              .directResolved(emptyList())
+              .extendsFrom(List.of())
+              .requested(List.of())
+              .directResolved(List.of())
               .build())))
           .build();
     }

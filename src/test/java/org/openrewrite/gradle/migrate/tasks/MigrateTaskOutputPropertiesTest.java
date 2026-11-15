@@ -108,7 +108,7 @@ class MigrateTaskOutputPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void testResultDirsKeepsValuesTheAssignmentWouldReject() {
+    void resultDirsKeepsValuesTheAssignmentWouldReject() {
         rewriteRun(
           buildGradle(
             """
