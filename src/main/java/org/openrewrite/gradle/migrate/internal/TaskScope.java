@@ -37,8 +37,10 @@ import static java.util.Arrays.asList;
  * property such as {@code version} or {@code destinationDir} whose name means something else elsewhere in a script.
  * A closure counts only when its owner proves the task by type ({@code tasks.withType(Jar)},
  * {@code task x(type: Jar)}, {@code tasks.register<Jar>("x")}) or by name, either a name the recipe knows or one this
- * script declares with a proven type. Blocks in between must leave the project as the delegate: a task name nested in
- * any other block, such as {@code sourceSets { test { } }}, is not that task.
+ * script declares with a proven type. A test set or JVM test suite the script declares, as in
+ * {@code testSets { integrationTest }} or {@code testing { suites { integrationTest(JvmTestSuite) } }}, proves a
+ * {@code Test} task of its name. Blocks in between must leave the project as the delegate: a task name nested in any
+ * other block, such as {@code sourceSets { test { } }}, is not that task.
  */
 public final class TaskScope {
     private static final Set<String> PROJECT_BLOCKS = new HashSet<>(asList(
@@ -47,6 +49,8 @@ public final class TaskScope {
     private static final Set<String> TYPED_LOOKUPS = new HashSet<>(asList(
             "create", "creating", "existing", "getByName", "getting", "maybeCreate", "named", "register", "registering"));
     private static final Set<String> CONFIGURE_METHODS = new HashSet<>(asList("all", "configure", "configureEach"));
+    private static final Set<String> SUITE_FACTORIES = new HashSet<>(asList("create", "maybeCreate", "register"));
+    private static final String TEST_TYPE = "org.gradle.api.tasks.testing.Test";
     private static final List<String> GRADLE_WILDCARD_PREFIXES = asList(
             "groovy.", "java.", "javax.", "kotlin.", "org.apache.tools.", "org.gradle.");
 
@@ -58,6 +62,7 @@ public final class TaskScope {
     private final Set<String> localTypes = new HashSet<>();
     private final Set<String> provenNames = new HashSet<>();
     private final Set<String> otherNames = new HashSet<>();
+    private final Set<String> testSuiteNames = new HashSet<>();
 
     /**
      * @param taskTypes  simple name to fully qualified name of the task types that count, subclasses included
@@ -93,9 +98,93 @@ public final class TaskScope {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, Integer p) {
                 recordDeclaration(m);
+                recordTestSuite(m, getCursor());
                 return super.visitMethodInvocation(m, p);
             }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                if (isInSuiteContainer(getCursor())) {
+                    // testSets { integrationTest }
+                    testSuiteNames.add(identifier.getSimpleName());
+                }
+                return super.visitIdentifier(identifier, p);
+            }
         }.visit(sourceFile, 0);
+        if (taskTypes.containsValue(TEST_TYPE)) {
+            provenNames.addAll(testSuiteNames);
+        }
+    }
+
+    /**
+     * The test-sets plugin and {@code jvm-test-suite} create a {@code Test} task named for each test set or suite.
+     */
+    private void recordTestSuite(J.MethodInvocation m, Cursor cursor) {
+        boolean factory = SUITE_FACTORIES.contains(m.getSimpleName());
+        if (m.getSelect() != null) {
+            // testSets.create('integrationTest'), testing.suites.register('integrationTest', JvmTestSuite)
+            if (factory && isSuiteContainer(m.getSelect())) {
+                addIfNotNull(testSuiteNames, literalName(m));
+            }
+        } else if (isInSuiteContainer(cursor)) {
+            // integrationTest { }, integrationTest(JvmTestSuite) { }, register('integrationTest', JvmTestSuite)
+            addIfNotNull(testSuiteNames, factory ? literalName(m) : m.getSimpleName());
+        }
+    }
+
+    private static void addIfNotNull(Set<String> names, @Nullable String name) {
+        if (name != null) {
+            names.add(name);
+        }
+    }
+
+    /**
+     * @return Whether the cursor is a statement of a {@code testSets { }} or {@code testing { suites { } }} closure.
+     */
+    private static boolean isInSuiteContainer(Cursor statement) {
+        Cursor owner = closureOwner(statement);
+        if (owner == null) {
+            return false;
+        }
+        J.MethodInvocation m = owner.getValue();
+        if (m.getSelect() != null) {
+            return isSuiteContainer(m.getSelect()) || "suites".equals(m.getSimpleName()) && isNamed(m.getSelect(), "testing");
+        }
+        if ("testSets".equals(m.getSimpleName())) {
+            return true;
+        }
+        Cursor testing = "suites".equals(m.getSimpleName()) ? closureOwner(owner) : null;
+        return testing != null && "testing".equals(((J.MethodInvocation) testing.getValue()).getSimpleName());
+    }
+
+    /**
+     * @return The call whose parameterless closure has the cursor as a statement, or null.
+     */
+    private static @Nullable Cursor closureOwner(Cursor statement) {
+        Cursor block = statement.getParentTreeCursor();
+        // Groovy wraps a bare name in an expression statement, and a closure's last statement in an implicit return
+        while (block.getValue() instanceof G.ExpressionStatement || block.getValue() instanceof J.Return) {
+            block = block.getParentTreeCursor();
+        }
+        if (!(block.getValue() instanceof J.Block)) {
+            return null;
+        }
+        Cursor lambda = block.getParentTreeCursor();
+        if (!(lambda.getValue() instanceof J.Lambda) || hasParameters(lambda.getValue())) {
+            return null;
+        }
+        Cursor owner = lambda.getParentTreeCursor();
+        return owner.getValue() instanceof J.MethodInvocation ? owner : null;
+    }
+
+    private static boolean isSuiteContainer(Expression expression) {
+        return isNamed(expression, "testSets") ||
+               expression instanceof J.FieldAccess && "suites".equals(((J.FieldAccess) expression).getSimpleName()) &&
+               isNamed(((J.FieldAccess) expression).getTarget(), "testing");
+    }
+
+    private static boolean isNamed(Expression expression, String name) {
+        return expression instanceof J.Identifier && name.equals(((J.Identifier) expression).getSimpleName());
     }
 
     private void recordDeclaration(J.MethodInvocation m) {
