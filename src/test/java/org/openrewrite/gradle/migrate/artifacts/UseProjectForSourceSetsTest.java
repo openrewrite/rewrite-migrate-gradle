@@ -23,6 +23,9 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
@@ -441,13 +444,13 @@ class UseProjectForSourceSetsTest implements RewriteTest {
                 compileOnly /* notation */ rootProject.project( /* path */ ":core") /* project */ .sourceSets /* sets */ .main /* main */ .output // trailing
             }
             """,
-            spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<java.util.Set<java.util.UUID>>() {
+            spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<Set<UUID>>() {
                 @Override
-                public J preVisit(J tree, java.util.Set<java.util.UUID> ids) {
+                public J preVisit(J tree, Set<UUID> ids) {
                     assertThat(ids.add(tree.getId())).as("duplicate tree id: " + tree.getId()).isTrue();
                     return tree;
                 }
-            }.visit(cu, new java.util.HashSet<>()))));
+            }.visit(cu, new HashSet<>()))));
     }
 
     @Test

@@ -30,6 +30,7 @@ import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -70,7 +71,7 @@ public class UseProjectForSourceSets extends Recipe {
                             call = (J.MethodInvocation) statement;
                         } else if (statement instanceof J.Return &&
                                    ((J.Return) statement).getExpression() instanceof J.MethodInvocation &&
-                                   (((J.Return) statement).getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent() ||
+                                   (((J.Return) statement).getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
                                     ((J.Return) statement).getMarkers().findFirst(org.openrewrite.groovy.marker.ImplicitReturn.class).isPresent())) {
                             call = (J.MethodInvocation) ((J.Return) statement).getExpression();
                         } else {

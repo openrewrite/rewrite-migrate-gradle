@@ -37,6 +37,7 @@ import org.openrewrite.properties.tree.Properties;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,9 +57,9 @@ public class MigratePluginPublishPlugin extends ScanningRecipe<MigratePluginPubl
     private static final String NEW_VERSION = "1.3.1";
 
     /** Set on the project's own extension in 1.x. */
-    private static final Set<String> BUNDLE_WIDE = new LinkedHashSet<>(java.util.Arrays.asList("website", "vcsUrl"));
+    private static final Set<String> BUNDLE_WIDE = new LinkedHashSet<>(Arrays.asList("website", "vcsUrl"));
     /** Set on each declared plugin in 1.x. */
-    private static final Set<String> PER_PLUGIN = new LinkedHashSet<>(java.util.Arrays.asList("displayName", "description", "tags"));
+    private static final Set<String> PER_PLUGIN = new LinkedHashSet<>(Arrays.asList("displayName", "description", "tags"));
 
     final String displayName = "Migrate the Plugin Publish plugin to 1.x";
 

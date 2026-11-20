@@ -27,8 +27,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -91,7 +93,7 @@ public class UseManifestAttributes extends Recipe {
                 Cursor parent = getCursor().getParentTreeCursor();
                 if (parent.getValue() instanceof J.Return) {
                     J.Return ret = parent.getValue();
-                    if (!canonical || !(ret.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent() ||
+                    if (!canonical || !(ret.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
                             ret.getMarkers().findFirst(org.openrewrite.groovy.marker.ImplicitReturn.class).isPresent())) {
                         return a;
                     }
@@ -112,7 +114,7 @@ public class UseManifestAttributes extends Recipe {
                 Space before = a.getPadding().getOperator().getBefore();
                 Space valuePrefix = a.getAssignment().getPrefix();
                 Space prefix = before.getComments().isEmpty() ? valuePrefix :
-                        before.withComments(org.openrewrite.internal.ListUtils.concatAll(before.getComments(), valuePrefix.getComments()));
+                        before.withComments(ListUtils.concatAll(before.getComments(), valuePrefix.getComments()));
                 if (prefix.getComments().isEmpty()) {
                     prefix = Space.EMPTY;
                 }
@@ -160,7 +162,7 @@ public class UseManifestAttributes extends Recipe {
                         Cursor statement = owner.getParentTreeCursor();
                         if (statement.getValue() instanceof J.Return) {
                             J.Return ret = statement.getValue();
-                            if (!(ret.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent() ||
+                            if (!(ret.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
                                   ret.getMarkers().findFirst(org.openrewrite.groovy.marker.ImplicitReturn.class).isPresent())) {
                                 return false;
                             }

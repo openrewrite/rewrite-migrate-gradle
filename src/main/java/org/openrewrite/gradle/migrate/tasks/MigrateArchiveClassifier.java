@@ -27,6 +27,7 @@ import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
@@ -160,7 +161,7 @@ public class MigrateArchiveClassifier extends Recipe {
                             return true;
                         }
                         return parent instanceof J.Return &&
-                               (((J.Return) parent).getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent() ||
+                               (((J.Return) parent).getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
                                 ((J.Return) parent).getMarkers().findFirst(org.openrewrite.groovy.marker.ImplicitReturn.class).isPresent());
                     }
 
