@@ -261,16 +261,14 @@ class MigrateTaskOutputPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void testSetAndSuiteTasks() {
+    void testSuiteTasks() {
         rewriteRun(
           buildGradle(
             """
               subprojects {
-                  testSets {
-                      integrationTest
-                  }
                   testing {
                       suites {
+                          integrationTest(JvmTestSuite)
                           functionalTest(JvmTestSuite)
                       }
                   }
@@ -282,11 +280,9 @@ class MigrateTaskOutputPropertiesTest implements RewriteTest {
               """,
             """
               subprojects {
-                  testSets {
-                      integrationTest
-                  }
                   testing {
                       suites {
+                          integrationTest(JvmTestSuite)
                           functionalTest(JvmTestSuite)
                       }
                   }

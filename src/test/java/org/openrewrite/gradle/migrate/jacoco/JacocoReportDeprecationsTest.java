@@ -577,16 +577,18 @@ class JacocoReportDeprecationsTest implements RewriteTest {
         }
 
         @Test
-        void testSetTaskInGroovy() {
+        void testSuiteTaskInGroovy() {
             rewriteRun(
               buildGradle(
                 """
                   allprojects {
-                      apply plugin: 'org.unbroken-dome.test-sets'
+                      apply plugin: 'jvm-test-suite'
 
-                      testSets {
-                          integrationTest {
-                              dirName = 'test-integration'
+                      testing {
+                          suites {
+                              integrationTest(JvmTestSuite) {
+                                  useJUnitJupiter()
+                              }
                           }
                       }
 
@@ -601,11 +603,13 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   """,
                 """
                   allprojects {
-                      apply plugin: 'org.unbroken-dome.test-sets'
+                      apply plugin: 'jvm-test-suite'
 
-                      testSets {
-                          integrationTest {
-                              dirName = 'test-integration'
+                      testing {
+                          suites {
+                              integrationTest(JvmTestSuite) {
+                                  useJUnitJupiter()
+                              }
                           }
                       }
 
@@ -623,76 +627,56 @@ class JacocoReportDeprecationsTest implements RewriteTest {
         }
 
         @Test
-        void testSetsAndSuitesDeclaredInOtherForms() {
+        void testSuitesDeclaredInOtherForms() {
             rewriteRun(
               buildGradle(
                 """
-                  testSets {
-                      functionalTest
-                      create('smokeTest')
-                  }
-                  testSets.create('acceptanceTest')
                   testing {
                       suites {
-                          integrationTest(JvmTestSuite) {
-                              useJUnitJupiter()
-                          }
+                          functionalTest(JvmTestSuite)
                           register('systemTest', JvmTestSuite)
                       }
+                  }
+                  testing.suites {
+                      smokeTest(JvmTestSuite)
                   }
                   testing.suites.register('e2eTest', JvmTestSuite)
 
                   functionalTest {
                       reports.html.enabled = false
                   }
-                  smokeTest.reports.junitXml.destination = file('smoke')
-                  tasks.named('acceptanceTest') {
-                      reports.html.enabled = false
-                  }
-                  tasks.integrationTest {
+                  systemTest.reports.junitXml.destination = file('system')
+                  tasks.smokeTest {
                       reports {
-                          junitXml.destination file('it')
+                          junitXml.destination file('smoke')
                       }
                   }
-                  systemTest {
-                      reports.html.enabled = false
-                  }
-                  e2eTest {
+                  tasks.named('e2eTest') {
                       reports.html.enabled = false
                   }
                   """,
                 """
-                  testSets {
-                      functionalTest
-                      create('smokeTest')
-                  }
-                  testSets.create('acceptanceTest')
                   testing {
                       suites {
-                          integrationTest(JvmTestSuite) {
-                              useJUnitJupiter()
-                          }
+                          functionalTest(JvmTestSuite)
                           register('systemTest', JvmTestSuite)
                       }
+                  }
+                  testing.suites {
+                      smokeTest(JvmTestSuite)
                   }
                   testing.suites.register('e2eTest', JvmTestSuite)
 
                   functionalTest {
                       reports.html.required = false
                   }
-                  smokeTest.reports.junitXml.outputLocation = file('smoke')
-                  tasks.named('acceptanceTest') {
-                      reports.html.required = false
-                  }
-                  tasks.integrationTest {
+                  systemTest.reports.junitXml.outputLocation = file('system')
+                  tasks.smokeTest {
                       reports {
-                          junitXml.outputLocation = file('it')
+                          junitXml.outputLocation = file('smoke')
                       }
                   }
-                  systemTest {
-                      reports.html.required = false
-                  }
-                  e2eTest {
+                  tasks.named('e2eTest') {
                       reports.html.required = false
                   }
                   """
@@ -710,7 +694,7 @@ class JacocoReportDeprecationsTest implements RewriteTest {
                   }
                   custom {
                       suites {
-                          functionalTest
+                          functionalTest(JvmTestSuite)
                       }
                   }
                   integrationTest {
