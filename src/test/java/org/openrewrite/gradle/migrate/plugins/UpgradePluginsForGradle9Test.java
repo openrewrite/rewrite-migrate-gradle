@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 
 class UpgradePluginsForGradle9Test implements RewriteTest {
     @Override
@@ -127,6 +128,41 @@ class UpgradePluginsForGradle9Test implements RewriteTest {
                 .buildscript(GradleProjectMarkers.buildscript()).build())
               .after(actual -> assertThat(actual)
                 .matches("plugins \\{ id 'com.netflix.nebula.optional-base' version '9\\.0\\.\\d+' }")
+                .actual())
+          )
+        );
+    }
+
+    @Test
+    void upgradeKotlinSettingsPlugins() {
+        rewriteRun(
+          settingsGradleKts(
+            """
+              plugins {
+                  id("org.gradle.toolchains.foojay-resolver-convention") version("0.5.0")
+                  id("org.gradle.toolchains.foojay-resolver") version("0.9.0")
+              }
+              """,
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("id\\(\"org.gradle.toolchains.foojay-resolver-convention\"\\) version\\(\"1\\.0\\.\\d+\"\\)")
+              .containsPattern("id\\(\"org.gradle.toolchains.foojay-resolver\"\\) version\\(\"1\\.0\\.\\d+\"\\)")
+              .actual())
+          )
+        );
+    }
+
+    @Test
+    void migrateLegacyNebulaOptionalBaseInKotlin() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { id("nebula.optional-base") version "7.0.0" }
+              """,
+            spec -> spec.markers(GradleProject.builder().id(Tree.randomId())
+                .plugins(List.of(new GradlePluginDescriptor("nebula.plugin.extraconfigurations.OptionalBasePlugin", "nebula.optional-base")))
+                .buildscript(GradleProjectMarkers.buildscript()).build())
+              .after(actual -> assertThat(actual)
+                .containsPattern("id\\(\"com.netflix.nebula.optional-base\"\\) version \"9\\.0\\.\\d+\"")
                 .actual())
           )
         );
