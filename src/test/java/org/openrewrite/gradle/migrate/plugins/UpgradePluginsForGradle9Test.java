@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.migrate.plugins;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -149,35 +150,38 @@ class UpgradePluginsForGradle9Test implements RewriteTest {
         );
     }
 
-    @Test
-    void doNotDowngradeNewerPlugins() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'com.diffplug.spotless' version '7.0.0'
-                  id 'com.github.spotbugs' version '6.2.4'
-                  id 'com.google.protobuf' version '0.9.5'
-                  id 'io.freefair.lombok' version '9.0.0'
-                  id 'nebula.netflixoss' version '13.0.0'
-              }
-              """
-          )
-        );
-    }
+    @Nested
+    class NoChange {
+        @Test
+        void doNotDowngradeNewerPlugins() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.diffplug.spotless' version '7.0.0'
+                      id 'com.github.spotbugs' version '6.2.4'
+                      id 'com.google.protobuf' version '0.9.5'
+                      id 'io.freefair.lombok' version '9.0.0'
+                      id 'nebula.netflixoss' version '13.0.0'
+                  }
+                  """
+              )
+            );
+        }
 
-    @Test
-    void unchangedPluginsThatWorkOnGradle9() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'com.diffplug.spotless-changelog' version '3.0.0'
-                  id 'com.bmuschko.docker-remote-api' version '9.4.0'
-                  id 'com.palantir.git-version' version '3.0.0'
-              }
-              """
-          )
-        );
+        @Test
+        void unchangedPluginsThatWorkOnGradle9() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.diffplug.spotless-changelog' version '3.0.0'
+                      id 'com.bmuschko.docker-remote-api' version '9.4.0'
+                      id 'com.palantir.git-version' version '3.0.0'
+                  }
+                  """
+              )
+            );
+        }
     }
 }

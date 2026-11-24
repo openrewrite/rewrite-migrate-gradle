@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.migrate.quality;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.gradle.migrate.GradleProjectMarkers;
@@ -194,80 +195,83 @@ class UpgradeSpotBugsToolVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void unchangedWhenPluginDefaultReadsJava25() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'com.github.spotbugs' version '6.2.4'
-              }
-              """
-          )
-        );
-    }
+    @Nested
+    class NoChange {
+        @Test
+        void unchangedWhenPluginDefaultReadsJava25() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.github.spotbugs' version '6.2.4'
+                  }
+                  """
+              )
+            );
+        }
 
-    @Test
-    void unchangedWhenPluginNotApplied() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'com.github.spotbugs' version '5.2.5' apply false
-              }
+        @Test
+        void unchangedWhenPluginNotApplied() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.github.spotbugs' version '5.2.5' apply false
+                  }
 
-              subprojects {
-                  apply plugin: 'com.github.spotbugs'
-              }
-              """
-          )
-        );
-    }
+                  subprojects {
+                      apply plugin: 'com.github.spotbugs'
+                  }
+                  """
+              )
+            );
+        }
 
-    @Test
-    void unchangedNewerToolVersion() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'com.github.spotbugs' version '5.2.5'
-              }
+        @Test
+        void unchangedNewerToolVersion() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.github.spotbugs' version '5.2.5'
+                  }
 
-              spotbugs {
-                  toolVersion = '5.0.0'
-              }
-              """
-          )
-        );
-    }
+                  spotbugs {
+                      toolVersion = '5.0.0'
+                  }
+                  """
+              )
+            );
+        }
 
-    @Test
-    void unchangedComputedToolVersion() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'com.github.spotbugs' version '5.2.5'
-              }
+        @Test
+        void unchangedComputedToolVersion() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.github.spotbugs' version '5.2.5'
+                  }
 
-              spotbugs {
-                  toolVersion = spotbugsVersion
-              }
-              """
-          )
-        );
-    }
+                  spotbugs {
+                      toolVersion = spotbugsVersion
+                  }
+                  """
+              )
+            );
+        }
 
-    @Test
-    void unchangedToolVersionOfOtherExtension() {
-        rewriteRun(
-          buildGradle(
-            """
-              checkstyle {
-                  toolVersion = '8.45'
-              }
-              """
-          )
-        );
+        @Test
+        void unchangedToolVersionOfOtherExtension() {
+            rewriteRun(
+              buildGradle(
+                """
+                  checkstyle {
+                      toolVersion = '8.45'
+                  }
+                  """
+              )
+            );
+        }
     }
 }

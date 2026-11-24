@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.migrate.quality;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.gradle.migrate.GradleProjectMarkers;
@@ -153,56 +154,59 @@ class UpgradeSpotlessGoogleJavaFormatTest implements RewriteTest {
         );
     }
 
-    @Test
-    void unchangedDefaultOfCurrentPlugin() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'com.diffplug.spotless' version '8.0.0'
-              }
-
-              spotless {
-                  java {
-                      googleJavaFormat()
+    @Nested
+    class NoChange {
+        @Test
+        void unchangedDefaultOfCurrentPlugin() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.diffplug.spotless' version '8.0.0'
                   }
-              }
-              """
-          )
-        );
-    }
 
-    @Test
-    void unchangedDefaultWithoutDeclaredPluginVersion() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'com.diffplug.spotless'
-              }
-
-              spotless {
-                  java {
-                      googleJavaFormat()
+                  spotless {
+                      java {
+                          googleJavaFormat()
+                      }
                   }
-              }
-              """
-          )
-        );
-    }
+                  """
+              )
+            );
+        }
 
-    @Test
-    void unchangedNewerVersion() {
-        rewriteRun(
-          buildGradle(
-            """
-              spotless {
-                  java {
-                      googleJavaFormat('1.28.0')
+        @Test
+        void unchangedDefaultWithoutDeclaredPluginVersion() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'com.diffplug.spotless'
                   }
-              }
-              """
-          )
-        );
+
+                  spotless {
+                      java {
+                          googleJavaFormat()
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void unchangedNewerVersion() {
+            rewriteRun(
+              buildGradle(
+                """
+                  spotless {
+                      java {
+                          googleJavaFormat('1.28.0')
+                      }
+                  }
+                  """
+              )
+            );
+        }
     }
 }

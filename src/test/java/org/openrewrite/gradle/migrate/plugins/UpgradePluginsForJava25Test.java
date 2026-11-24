@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.migrate.plugins;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -122,18 +123,21 @@ class UpgradePluginsForJava25Test implements RewriteTest {
         );
     }
 
-    @Test
-    void doNotDowngradeNewerPlugins() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'net.ltgt.errorprone' version '5.0.0'
-                  id 'org.gradle.test-retry' version '2.0.0'
-                  id 'com.bmuschko.docker-java-application' version '11.0.0'
-              }
-              """
-          )
-        );
+    @Nested
+    class NoChange {
+        @Test
+        void doNotDowngradeNewerPlugins() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'net.ltgt.errorprone' version '5.0.0'
+                      id 'org.gradle.test-retry' version '2.0.0'
+                      id 'com.bmuschko.docker-java-application' version '11.0.0'
+                  }
+                  """
+              )
+            );
+        }
     }
 }
