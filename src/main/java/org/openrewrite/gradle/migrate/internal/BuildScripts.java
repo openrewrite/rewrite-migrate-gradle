@@ -48,10 +48,9 @@ public final class BuildScripts {
     /// the script declares none, as when a parent project or settings plugin management supplies the version.
     public static @Nullable String declaredPluginVersion(JavaSourceFile cu, String pluginIdPattern) {
         LatestRelease versions = new LatestRelease(null);
-        AtomicReference<@Nullable String> highest = new AtomicReference<>();
-        new JavaIsoVisitor<Integer>() {
+        return new JavaIsoVisitor<AtomicReference<@Nullable String>>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicReference<@Nullable String> highest) {
                 new GradlePlugin.Matcher().pluginIdPattern(pluginIdPattern).get(getCursor()).ifPresent(plugin -> {
                     String version = plugin.getVersion();
                     if (version != null && versions.isValid(null, version) &&
@@ -59,10 +58,9 @@ public final class BuildScripts {
                         highest.set(version);
                     }
                 });
-                return super.visitMethodInvocation(method, p);
+                return super.visitMethodInvocation(method, highest);
             }
-        }.visit(cu, 0);
-        return highest.get();
+        }.reduce(cu, new AtomicReference<>()).get();
     }
 
     public static boolean isInsideBlock(Cursor cursor, String blockName) {
