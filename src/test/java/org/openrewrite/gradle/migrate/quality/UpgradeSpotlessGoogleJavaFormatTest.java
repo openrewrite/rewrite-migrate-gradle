@@ -118,6 +118,42 @@ class UpgradeSpotlessGoogleJavaFormatTest implements RewriteTest {
     }
 
     @Test
+    void pinDefaultInSubprojectsOfUnappliedPlugin() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'com.diffplug.spotless' version '6.25.0' apply false
+              }
+
+              subprojects {
+                  apply plugin: 'com.diffplug.spotless'
+                  spotless {
+                      java {
+                          googleJavaFormat()
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.diffplug.spotless' version '6.25.0' apply false
+              }
+
+              subprojects {
+                  apply plugin: 'com.diffplug.spotless'
+                  spotless {
+                      java {
+                          googleJavaFormat('1.27.0')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void unchangedDefaultOfCurrentPlugin() {
         rewriteRun(
           buildGradle(

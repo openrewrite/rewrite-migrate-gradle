@@ -75,7 +75,7 @@ public class UpgradeSpotBugsToolVersion extends Recipe {
                     if (toolVersionSet.get()) {
                         return upgraded;
                     }
-                    String pluginVersion = declaredPluginVersion(cu, PLUGIN_ID_PATTERN);
+                    String pluginVersion = declaredPluginVersion(cu, PLUGIN_ID_PATTERN, true);
                     if (pluginVersion == null ||
                         new LatestRelease(null).compare(null, pluginVersion, FIRST_PLUGIN_WITH_CURRENT_DEFAULT) >= 0) {
                         return cu;

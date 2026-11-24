@@ -102,6 +102,29 @@ class UpgradeSpotBugsToolVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradeToolVersionInSubprojects() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'com.github.spotbugs' version '5.2.5' apply false
+              }
+
+              subprojects {
+                  apply plugin: 'com.github.spotbugs'
+                  spotbugs {
+                      toolVersion = '4.8.3'
+                  }
+              }
+              """,
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("toolVersion = '4\\.9\\.\\d+'")
+              .actual())
+          )
+        );
+    }
+
+    @Test
     void addToolVersionForOlderPluginDefault() {
         rewriteRun(
           buildGradle(
@@ -178,6 +201,23 @@ class UpgradeSpotBugsToolVersionTest implements RewriteTest {
             """
               plugins {
                   id 'com.github.spotbugs' version '6.2.4'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unchangedWhenPluginNotApplied() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'com.github.spotbugs' version '5.2.5' apply false
+              }
+
+              subprojects {
+                  apply plugin: 'com.github.spotbugs'
               }
               """
           )

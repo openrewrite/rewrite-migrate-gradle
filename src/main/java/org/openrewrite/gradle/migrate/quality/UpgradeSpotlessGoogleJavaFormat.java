@@ -69,7 +69,7 @@ public class UpgradeSpotlessGoogleJavaFormat extends Recipe {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     selector = new DependencyVersionSelector(metadataFailures,
                             cu.getMarkers().findFirst(GradleProject.class).orElse(null), null);
-                    String pluginVersion = declaredPluginVersion(cu, "com.diffplug.spotless");
+                    String pluginVersion = declaredPluginVersion(cu, "com.diffplug.spotless", false);
                     pinDefault = pluginVersion != null &&
                                  new LatestRelease(null).compare(null, pluginVersion, FIRST_PLUGIN_WITH_CURRENT_DEFAULT) < 0;
                 }

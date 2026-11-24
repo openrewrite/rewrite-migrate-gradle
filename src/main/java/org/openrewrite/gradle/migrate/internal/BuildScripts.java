@@ -34,6 +34,7 @@ import org.openrewrite.tree.ParseError;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
@@ -46,19 +47,23 @@ public final class BuildScripts {
 
     /// The highest literal version a build script declares for a plugin matching `pluginIdPattern`, or `null` when
     /// the script declares none, as when a parent project or settings plugin management supplies the version.
-    public static @Nullable String declaredPluginVersion(JavaSourceFile cu, String pluginIdPattern) {
+    /// With `appliedOnly`, declarations marked `apply false` are ignored.
+    public static @Nullable String declaredPluginVersion(JavaSourceFile cu, String pluginIdPattern, boolean appliedOnly) {
         LatestRelease versions = new LatestRelease(null);
         return new JavaIsoVisitor<AtomicReference<@Nullable String>>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicReference<@Nullable String> highest) {
-                new GradlePlugin.Matcher().pluginIdPattern(pluginIdPattern).get(getCursor()).ifPresent(plugin -> {
-                    String version = plugin.getVersion();
-                    if (version != null && versions.isValid(null, version) &&
-                        (highest.get() == null || versions.compare(null, version, highest.get()) > 0)) {
-                        highest.set(version);
-                    }
-                });
-                return super.visitMethodInvocation(method, highest);
+                Optional<GradlePlugin> declared = new GradlePlugin.Matcher().pluginIdPattern(pluginIdPattern).get(getCursor());
+                if (!declared.isPresent()) {
+                    return super.visitMethodInvocation(method, highest);
+                }
+                // The `id` and `version` invocations nested in `apply false` match too, but report the plugin as applied
+                String version = declared.get().getVersion();
+                if (version != null && (declared.get().isApplied() || !appliedOnly) && versions.isValid(null, version) &&
+                    (highest.get() == null || versions.compare(null, version, highest.get()) > 0)) {
+                    highest.set(version);
+                }
+                return method;
             }
         }.reduce(cu, new AtomicReference<>()).get();
     }
