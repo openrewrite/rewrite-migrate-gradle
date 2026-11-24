@@ -28,6 +28,8 @@ recipeList:
   - org.openrewrite.gradle.migrate.artifacts.UseMavenCentralInsteadOfJcenter
   # Legacy Shadow versions use APIs removed in Gradle 9
   - org.openrewrite.gradle.migrate.plugins.UpgradeShadowPlugin
+  # Widely used third-party plugins whose older versions use APIs removed in Gradle 9
+  - org.openrewrite.gradle.migrate.plugins.UpgradePluginsForGradle9
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.migrate.artifacts.DependencyUseStringNotation
   - org.openrewrite.gradle.migrate.artifacts.OneDependencyDeclarationPerStatement
@@ -100,3 +102,95 @@ recipeList:
   - org.openrewrite.gradle.migrate.artifacts.RemoveConfigurationVisible
   # Implicit parallel model building through org.gradle.parallel is deprecated in 9.8 and an error in 10
   - org.openrewrite.gradle.migrate.properties.AddToolingParallelProperty
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.migrate.plugins.UpgradePluginsForGradle9
+displayName: Upgrade third-party plugins for Gradle 9
+description: >-
+  Upgrade widely used third-party Gradle plugins whose older versions use APIs removed in Gradle 9,
+  staying on the earliest version line that works with it and preserving newer versions.
+  Plugins whose fix is tied to a framework upgrade, such as Flyway, Hibernate ORM or Micronaut, are left alone.
+recipeList:
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: org.gradle.toolchains.foojay-resolver*
+      newVersion: 1.0.x
+  - org.openrewrite.gradle.plugins.ChangePlugin:
+      pluginId: nebula.optional-base
+      newPluginId: com.netflix.nebula.optional-base
+      newVersion: 9.0.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.netflix.nebula.optional-base
+      newVersion: 9.0.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: nebula.netflixoss
+      newVersion: 12.0.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.netflix.nebula.netflixoss
+      newVersion: 12.0.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.diffplug.spotless
+      newVersion: 6.25.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.github.spotbugs*
+      newVersion: 5.2.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: org.sonarqube
+      newVersion: 6.2.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.github.ben-manes.versions
+      newVersion: 0.52.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.adarshr.test-logger
+      newVersion: 4.0.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: info.solidsoft.pitest*
+      newVersion: 1.19.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: org.checkerframework
+      newVersion: 0.6.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.github.jk1.dependency-license-report
+      newVersion: 2.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: io.qameta.allure*
+      newVersion: 3.0.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: me.champeau.jmh
+      newVersion: 0.7.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: io.freefair.*
+      newVersion: 8.14.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.google.protobuf
+      newVersion: 0.9.4
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.gorylenko.gradle-git-properties
+      newVersion: 2.5.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.google.cloud.tools.jib
+      newVersion: 3.5.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: org.asciidoctor.jvm.*
+      newVersion: 4.0.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: io.github.gradle-nexus.publish-plugin
+      newVersion: 2.0.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.vanniktech.maven.publish*
+      newVersion: 0.32.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: org.unbroken-dome.test-sets
+      newVersion: 4.1.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.github.davidmc24.gradle.plugin.avro*
+      newVersion: 1.2.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: org.graalvm.buildtools.native
+      newVersion: 0.9.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: nu.studer.jooq
+      newVersion: 8.2.x
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.bmuschko.docker-*-application
+      newVersion: 9.x
